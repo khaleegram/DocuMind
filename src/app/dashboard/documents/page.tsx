@@ -172,6 +172,11 @@ export default function AllDocumentsPage() {
     setSubmittedSearchQuery(searchQuery);
   };
 
+  const clearFilters = useCallback(() => {
+    setActiveFilters({ owner: new Set(), type: new Set(), company: new Set(), country: new Set() });
+    setAiSearchResults(null);
+  }, []);
+
   const handleAiSearch = useCallback((criteria: IntelligentSearchOutput) => {
     const searchTerms = [
         criteria.owner,
@@ -257,10 +262,6 @@ export default function AllDocumentsPage() {
     }
   };
   
-  const clearFilters = useCallback(() => {
-    setActiveFilters({ owner: new Set(), type: new Set(), company: new Set(), country: new Set() });
-    setAiSearchResults(null);
-  }, []);
 
   if (loading || (!user && !loading)) {
     return (
