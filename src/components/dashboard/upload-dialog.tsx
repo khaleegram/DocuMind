@@ -54,7 +54,7 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
 
   const onSubmit = async (values: z.infer<typeof uploadSchema>) => {
     setIsProcessing(true);
-    let user = auth.currentUser;
+    const user = auth.currentUser;
 
     if (!user) {
       toast({ variant: 'destructive', title: 'Not Authenticated', description: 'You must be logged in to upload documents.' });
@@ -72,7 +72,7 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
       // We need to get the credential from the original sign-in.
       // A simple way is to re-trigger the popup, Firebase often caches this
       // and it happens instantly without user interaction.
-      const result = await signInWithPopup(user, provider);
+      const result = await signInWithPopup(auth, provider);
       const credential = GoogleAuthProvider.credentialFromResult(result);
 
       if (!credential || !credential.accessToken) {
@@ -287,5 +287,3 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
     </Dialog>
   );
 }
-
-    
