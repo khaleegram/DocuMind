@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -24,7 +25,7 @@ import { extractTextFromImage } from '@/ai/flows/extract-text-from-image';
 import { auth, db } from '@/lib/firebase';
 import { v4 as uuidv4 } from 'uuid';
 import { doc, addDoc, collection, serverTimestamp, updateDoc } from 'firebase/firestore';
-import { GoogleAuthProvider, reauthenticateWithPopup, getAdditionalUserInfo } from 'firebase/auth';
+import { GoogleAuthProvider, getAdditionalUserInfo, signInWithPopup } from 'firebase/auth';
 
 
 const uploadSchema = z.object({
@@ -53,7 +54,7 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
 
   const onSubmit = async (values: z.infer<typeof uploadSchema>) => {
     setIsProcessing(true);
-    const user = auth.currentUser;
+    let user = auth.currentUser;
 
     if (!user) {
       toast({ variant: 'destructive', title: 'Not Authenticated', description: 'You must be logged in to upload documents.' });
@@ -65,12 +66,15 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
     const uniqueFileName = `${uuidv4()}-${file.name}`;
   
     try {
-      // Reauthenticate to get a fresh credential
       const provider = new GoogleAuthProvider();
       provider.addScope('https://www.googleapis.com/auth/drive.file');
-      const result = await reauthenticateWithPopup(user, provider);
-      const credential = GoogleAuthProvider.credentialFromResult(result);
       
+      // We need to get the credential from the original sign-in.
+      // A simple way is to re-trigger the popup, Firebase often caches this
+      // and it happens instantly without user interaction.
+      const result = await signInWithPopup(user, provider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+
       if (!credential || !credential.accessToken) {
         throw new Error("Could not retrieve a valid access token. Please sign in again.");
       }
@@ -103,7 +107,7 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
         body: file
       });
       
-      const fileMetadata = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFile.id}?fields=webViewLink,thumbnailLink`, {
+      const fileMetadata = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFile.id}?fields=webViewLink`, {
           headers: new Headers({ 'Authorization': 'Bearer ' + accessToken })
       }).then(res => res.json());
 
@@ -155,7 +159,7 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
 
           const { keywords } = await enhanceSearchWithKeywords({ documentText: textExtraction.text });
           
-          await updateDoc(doc(db, 'documents', docRef.id), { ...metadata, keywords, isProcessing: false });
+          await updateDoc(doc(db, 'documents', docRef.id), { ...metadata, keywords, summary: metadata.summary, isProcessing: false });
 
           toast({
             title: 'Processing Complete!',
@@ -283,3 +287,5 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
     </Dialog>
   );
 }
+
+    
