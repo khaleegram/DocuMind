@@ -18,6 +18,7 @@ import FilterSidebar from '@/components/dashboard/filter-sidebar';
 import Fuse from 'fuse.js';
 import type { IntelligentSearchOutput } from '@/ai/flows/intelligent-search';
 import { EmptyState } from '@/components/dashboard/empty-state';
+import { intelligentSearch } from '@/ai/flows/intelligent-search';
 
 export type FilterCategory = 'owner' | 'type' | 'company' | 'country';
 
@@ -139,7 +140,7 @@ export default function AllDocumentsPage() {
   const handleAiSearch = useCallback((searchString: string) => {
     const fuse = new Fuse(documents, {
         keys: ['owner', 'company', 'type', 'keywords', 'summary', 'textContent', 'country', 'fileName'],
-        threshold: 0.4, 
+        threshold: 0.4,
         includeScore: true,
     });
     
