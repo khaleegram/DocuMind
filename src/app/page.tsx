@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { GoogleIcon } from '@/components/icons/google-icon';
 import { FileSearch, Loader2 } from 'lucide-react';
 import { auth, googleProvider } from '@/lib/firebase';
-import { signInWithPopup } from 'firebase/auth';
+import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
@@ -34,7 +34,17 @@ export default function LoginPage() {
   const handleLogin = async () => {
     setIsLoggingIn(true);
     try {
-      await signInWithPopup(auth, googleProvider);
+      const result = await signInWithPopup(auth, googleProvider);
+      // This gives you a Google Access Token. You can use it to access the Google API.
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      const token = credential?.accessToken;
+      // You can store the token in your state or a secure place to make API calls
+      // For this example, we'll just log it.
+      if (token) {
+        // In a real app, you would likely store this token securely
+        // and use it to make authenticated requests to the Google Drive API.
+        console.log("Google Access Token:", token);
+      }
       router.push('/dashboard');
     } catch (error: any) {
       console.error("Authentication failed:", error);

@@ -19,10 +19,10 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, FileUp } from 'lucide-react';
 import { extractDocumentMetadata } from '@/ai/flows/extract-document-metadata';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { auth, db } from '@/lib/firebase';
 import { v4 as uuidv4 } from 'uuid';
 import { doc, addDoc, collection, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { GoogleAuthProvider } from 'firebase/auth';
 
 
 const uploadSchema = z.object({
@@ -52,6 +52,7 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
   const onSubmit = async (values: z.infer<typeof uploadSchema>) => {
     setIsProcessing(true);
     const user = auth.currentUser;
+
     if (!user) {
       toast({ variant: 'destructive', title: 'Not Authenticated', description: 'You must be logged in to upload documents.' });
       setIsProcessing(false);
@@ -62,11 +63,45 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
     const uniqueFileName = `${uuidv4()}-${file.name}`;
   
     try {
-      // 1. Upload file to Firebase Storage
-      const storage = getStorage();
-      const storageRef = ref(storage, `documents/${user.uid}/${uniqueFileName}`);
-      const snapshot = await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(snapshot.ref);
+      const userCredential = await auth.currentUser?.getIdTokenResult();
+      const googleCredential = GoogleAuthProvider.credential(userCredential?.token);
+      
+      if (!googleCredential) {
+        throw new Error("Could not get Google credential");
+      }
+
+      // 1. Upload file to Google Drive
+      const driveResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+        method: 'POST',
+        headers: new Headers({ 
+          'Authorization': 'Bearer ' + userCredential.token,
+          'Content-Type': 'application/json',
+        }),
+        body: JSON.stringify({
+          name: uniqueFileName,
+          mimeType: file.type,
+        })
+      });
+      const driveFile = await driveResponse.json();
+
+      if (driveFile.error) {
+        throw new Error(driveFile.error.message);
+      }
+
+      await fetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFile.id}?uploadType=media`, {
+        method: 'PATCH',
+        headers: new Headers({
+            'Authorization': 'Bearer ' + userCredential.token,
+            'Content-Type': file.type,
+        }),
+        body: file
+      })
+
+      const fileMetadata = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFile.id}?fields=webViewLink,iconLink`, {
+          headers: new Headers({ 'Authorization': 'Bearer ' + userCredential.token })
+      }).then(res => res.json());
+
+      const downloadURL = fileMetadata.webViewLink;
 
       // 2. Create a placeholder document in Firestore
       const docRef = await addDoc(collection(db, 'documents'), {
@@ -101,7 +136,7 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
         
         try {
           const metadata = await extractDocumentMetadata({ documentDataUrl: dataUrl });
-          await updateDoc(doc(db, 'documents', docRef.id), { ...metadata, isProcessing: false });
+          await updateDoc(doc(db, 'documents', docRef.id), { ...metadata, fileUrl: downloadURL, isProcessing: false });
           toast({
             title: 'Processing Complete!',
             description: `Successfully analyzed and saved your ${metadata.documentType}.`,
@@ -124,6 +159,7 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
         await updateDoc(doc(db, 'documents', docRef.id), {
           owner: file.name,
           type: 'PDF Document',
+          fileUrl: downloadURL,
           isProcessing: false,
         });
         toast({
