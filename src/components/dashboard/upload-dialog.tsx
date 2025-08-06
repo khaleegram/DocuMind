@@ -99,7 +99,7 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
       const accessToken = credential.accessToken;
       
       // 1. Upload file to Google Drive
-      const driveResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+      const driveMetadataResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
         method: 'POST',
         headers: new Headers({ 
           'Authorization': 'Bearer ' + accessToken,
@@ -108,15 +108,17 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
         body: JSON.stringify({
           name: uniqueFileName,
           mimeType: file.type,
+          // You can add 'parents': ['FOLDER_ID'] here to upload to a specific folder
         })
       });
-      const driveFile = await driveResponse.json();
 
-      if (driveFile.error) {
-        throw new Error(driveFile.error.message);
+      if (!driveMetadataResponse.ok) {
+        const errorBody = await driveMetadataResponse.json().catch(() => ({ error: { message: "Unknown error during Drive metadata creation." }}));
+        throw new Error(errorBody.error.message);
       }
+      const driveFile = await driveMetadataResponse.json();
 
-      await fetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFile.id}?uploadType=media`, {
+      const mediaUploadResponse = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFile.id}?uploadType=media`, {
         method: 'PATCH',
         headers: new Headers({
             'Authorization': 'Bearer ' + accessToken,
@@ -124,6 +126,11 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
         }),
         body: file
       });
+
+      if (!mediaUploadResponse.ok) {
+         const errorBody = await mediaUploadResponse.json().catch(() => ({ error: { message: "Unknown error during Drive media upload." }}));
+         throw new Error(errorBody.error.message);
+      }
       
       const fileMetadata = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFile.id}?fields=webViewLink,thumbnailLink`, {
           headers: new Headers({ 'Authorization': 'Bearer ' + accessToken })
