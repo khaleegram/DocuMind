@@ -3,12 +3,12 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { FileText, Calendar, User, Building, MoreVertical, Link as LinkIcon, Trash2 } from 'lucide-react';
+import { FileText, Calendar, Building, MoreVertical, Link as LinkIcon, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { format, parseISO } from 'date-fns';
 
-export function DocumentCard({ document, onDelete }: { document: Document, onDelete: (id: string) => void }) {
+export function DocumentCard({ document, onDelete }: { document: Document, onDelete: (doc: Document) => void }) {
   const getAiHint = (type: string) => {
     switch (type.toLowerCase()) {
       case 'passport':
@@ -78,7 +78,7 @@ export function DocumentCard({ document, onDelete }: { document: Document, onDel
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onDelete(document.id)} className="text-destructive">
+            <DropdownMenuItem onClick={() => onDelete(document)} className="text-destructive">
               <Trash2 className="mr-2 h-4 w-4" />
               Delete
             </DropdownMenuItem>

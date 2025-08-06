@@ -1,63 +1,51 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
-import type { Document } from '@/lib/types';
+import React, { useState, useMemo, useEffect } from 'react';
+import type { Document as DocumentType } from '@/lib/types';
 import Header from '@/components/dashboard/header';
 import DocumentList from '@/components/dashboard/document-list';
 import { UploadDialog } from '@/components/dashboard/upload-dialog';
-import { format } from 'date-fns';
-
-const mockDocuments: Document[] = [
-  {
-    id: '1',
-    fileId: 'gdrive_id_1',
-    owner: 'John Doe',
-    company: 'Nike',
-    type: 'Passport',
-    expiry: '2027-05-15',
-    keywords: ['Nigeria', 'Passport', 'Visa'],
-    uploadedAt: '2024-08-06',
-    fileUrl: 'https://placehold.co/800x1100.png',
-  },
-  {
-    id: '2',
-    fileId: 'gdrive_id_2',
-    owner: 'Jane Smith',
-    company: 'Apple Inc.',
-    type: 'Contract',
-    expiry: null,
-    keywords: ['Employment', 'NDA', 'Software Engineer'],
-    uploadedAt: '2024-07-22',
-    fileUrl: 'https://placehold.co/800x1100.png',
-  },
-  {
-    id: '3',
-    fileId: 'gdrive_id_3',
-    owner: 'Project Alpha',
-    company: 'Microsoft',
-    type: 'Receipt',
-    expiry: null,
-    keywords: ['Software', 'License', 'Azure'],
-    uploadedAt: '2024-08-01',
-    fileUrl: 'https://placehold.co/800x1100.png',
-  },
-  {
-    id: '4',
-    fileId: 'gdrive_id_4',
-    owner: 'John Doe',
-    type: 'Visa',
-    expiry: '2025-12-31',
-    keywords: ['USA', 'Travel', 'B1/B2'],
-    uploadedAt: '2024-06-15',
-    fileUrl: 'https://placehold.co/800x1100.png',
-  },
-];
-
+import { auth, db, storage } from '@/lib/firebase';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { useRouter } from 'next/navigation';
+import { collection, query, where, onSnapshot, addDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { ref, deleteObject } from 'firebase/storage';
+import { Loader2 } from 'lucide-react';
 
 export default function DashboardPage() {
-  const [documents, setDocuments] = useState<Document[]>(mockDocuments);
+  const [user, loading] = useAuthState(auth);
+  const router = useRouter();
+  const [documents, setDocuments] = useState<DocumentType[]>([]);
+  const [isLoadingDocs, setIsLoadingDocs] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [isUploadDialogOpen, setUploadDialogOpen] = useState(false);
+
+  useEffect(() => {
+    if (loading) return;
+    if (!user) {
+      router.push('/');
+      return;
+    }
+
+    setIsLoadingDocs(true);
+    const q = query(collection(db, 'documents'), where('userId', '==', user.uid));
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const docs: DocumentType[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        docs.push({ 
+          id: doc.id, 
+          ...data,
+          uploadedAt: data.uploadedAt?.toDate().toISOString() || new Date().toISOString(),
+        } as DocumentType);
+      });
+      setDocuments(docs.sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()));
+      setIsLoadingDocs(false);
+    });
+
+    return () => unsubscribe();
+  }, [user, loading, router]);
+
 
   const filteredDocuments = useMemo(() => {
     if (!searchQuery) return documents;
@@ -70,25 +58,41 @@ export default function DashboardPage() {
     );
   }, [documents, searchQuery]);
 
-  const handleAddDocument = (newDocData: Omit<Document, 'id' | 'fileId' | 'uploadedAt' | 'fileUrl'>) => {
-    const newDoc: Document = {
-      id: (documents.length + 1).toString(),
-      fileId: `gdrive_id_${documents.length + 1}`,
-      uploadedAt: format(new Date(), 'yyyy-MM-dd'),
-      fileUrl: 'https://placehold.co/800x1100.png',
-      ...newDocData
-    };
-    setDocuments(prev => [newDoc, ...prev]);
+  const handleAddDocument = async (newDocData: Omit<DocumentType, 'id' | 'userId' | 'uploadedAt'>) => {
+    if (!user) return;
+    await addDoc(collection(db, 'documents'), {
+      ...newDocData,
+      userId: user.uid,
+      uploadedAt: serverTimestamp(),
+    });
   };
 
-  const handleDeleteDocument = (id: string) => {
-    setDocuments(prev => prev.filter(doc => doc.id !== id));
+  const handleDeleteDocument = async (docToDelete: DocumentType) => {
+    if (!user) return;
+    try {
+      // Delete firestore document
+      await deleteDoc(doc(db, 'documents', docToDelete.id));
+
+      // Delete file from storage
+      const fileRef = ref(storage, `documents/${user.uid}/${docToDelete.fileName}`);
+      await deleteObject(fileRef);
+    } catch (error) {
+        console.error("Error deleting document: ", error);
+    }
   };
-
-
+  
+  if (loading || isLoadingDocs) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="h-16 w-16 animate-spin text-primary" />
+      </div>
+    );
+  }
+  
   return (
     <div className="flex flex-col h-screen">
       <Header 
+        user={user}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         onUploadClick={() => setUploadDialogOpen(true)}

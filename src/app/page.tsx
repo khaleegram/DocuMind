@@ -4,15 +4,47 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { GoogleIcon } from '@/components/icons/google-icon';
-import { FileSearch } from 'lucide-react';
+import { FileSearch, Loader2 } from 'lucide-react';
+import { auth, googleProvider } from '@/lib/firebase';
+import { signInWithPopup } from 'firebase/auth';
+import { useToast } from '@/hooks/use-toast';
+import { useState } from 'react';
+import { useAuthState } from 'react-firebase-hooks/auth';
 
 export default function LoginPage() {
   const router = useRouter();
+  const { toast } = useToast();
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [user, loading] = useAuthState(auth);
 
-  const handleLogin = () => {
-    // In a real app, this would trigger Firebase Google Auth and request Drive scopes.
-    // For this prototype, we'll just navigate to the dashboard.
+  if (loading) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center p-4">
+        <Loader2 className="h-16 w-16 animate-spin text-primary" />
+      </main>
+    );
+  }
+
+  if (user) {
     router.push('/dashboard');
+    return null;
+  }
+
+  const handleLogin = async () => {
+    setIsLoggingIn(true);
+    try {
+      await signInWithPopup(auth, googleProvider);
+      router.push('/dashboard');
+    } catch (error) {
+      console.error("Authentication failed:", error);
+      toast({
+        variant: 'destructive',
+        title: 'Login Failed',
+        description: 'Could not sign in with Google. Please try again.',
+      });
+    } finally {
+      setIsLoggingIn(false);
+    }
   };
 
   return (
@@ -27,8 +59,12 @@ export default function LoginPage() {
             <CardDescription className="text-lg mt-2 text-muted-foreground">Your intelligent document assistant.</CardDescription>
           </CardHeader>
           <CardContent className="p-8 pt-0">
-            <Button onClick={handleLogin} className="w-full h-12 text-lg bg-accent hover:bg-accent/90 text-accent-foreground">
-              <GoogleIcon className="mr-3 h-6 w-6" />
+            <Button onClick={handleLogin} disabled={isLoggingIn} className="w-full h-12 text-lg bg-accent hover:bg-accent/90 text-accent-foreground">
+              {isLoggingIn ? (
+                <Loader2 className="mr-3 h-6 w-6 animate-spin" />
+              ) : (
+                <GoogleIcon className="mr-3 h-6 w-6" />
+              )}
               Sign in with Google
             </Button>
             <p className="text-xs text-muted-foreground mt-4 text-center">

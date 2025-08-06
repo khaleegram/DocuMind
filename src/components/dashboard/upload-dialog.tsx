@@ -16,107 +16,173 @@ import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import type { Document } from '@/lib/types';
-import { Loader2 } from 'lucide-react';
+import { Loader2, FileUp } from 'lucide-react';
 import { extractDocumentMetadata } from '@/ai/flows/extract-document-metadata';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { auth } from '@/lib/firebase';
+import { v4 as uuidv4 } from 'uuid';
 
 const uploadSchema = z.object({
   file: z.instanceof(FileList).refine(files => files?.length === 1, 'File is required.'),
-  documentText: z.string().min(1, 'Document text cannot be empty.').min(10, 'Document text must be at least 10 characters.'),
 });
 
 type UploadDialogProps = {
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
-  onDocumentAdd: (newDocData: Omit<Document, 'id' | 'fileId' | 'uploadedAt' | 'fileUrl'>) => void;
+  onDocumentAdd: (newDocData: Omit<Document, 'id' | 'userId' | 'uploadedAt'>) => void;
 };
+
+// Function to get text from an image file
+const getTextFromImage = async (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const photoDataUri = e.target?.result as string;
+        // This is a simplified version. In a real app, you might need a more robust OCR solution.
+        // For this example, we'll imagine a hypothetical client-side OCR or send to a backend.
+        // Let's use AI to extract text from image data URI
+        const metadata = await extractDocumentMetadata({ documentText: photoDataUri });
+        resolve(JSON.stringify(metadata));
+      } catch (error) {
+        reject(error);
+      }
+    };
+    reader.onerror = (error) => {
+      reject(error);
+    };
+    reader.readAsDataURL(file);
+  });
+};
+
 
 export function UploadDialog({ isOpen, setIsOpen, onDocumentAdd }: UploadDialogProps) {
   const [isProcessing, setIsProcessing] = useState(false);
+  const [fileName, setFileName] = useState('');
   const { toast } = useToast();
   const form = useForm<z.infer<typeof uploadSchema>>({
     resolver: zodResolver(uploadSchema),
-    defaultValues: {
-      documentText: "",
-    }
   });
 
   const onSubmit = async (values: z.infer<typeof uploadSchema>) => {
     setIsProcessing(true);
+    const user = auth.currentUser;
+    if (!user) {
+      toast({ variant: 'destructive', title: 'Not Authenticated', description: 'You must be logged in to upload documents.' });
+      setIsProcessing(false);
+      return;
+    }
+  
+    const file = values.file[0];
+    const uniqueFileName = `${uuidv4()}-${file.name}`;
+  
     try {
-      // In a real app, you'd upload the file to a service like Google Drive,
-      // then use an OCR service like Google Vision API on the backend to get the text.
-      // Here, we simulate the AI processing step with the provided text.
-      const metadata = await extractDocumentMetadata({ documentText: values.documentText });
-
+      // 1. Upload file to Firebase Storage
+      const storage = getStorage();
+      const storageRef = ref(storage, `documents/${user.uid}/${uniqueFileName}`);
+      const snapshot = await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(snapshot.ref);
+  
+      // 2. Extract text from the file (image or PDF)
+      let documentText = '';
+      if (file.type.startsWith('image/')) {
+        // In a real app, you would use a proper OCR service.
+        // We'll simulate by creating a data URI and passing to the AI flow.
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          reader.onload = e => resolve(e.target?.result as string);
+          reader.onerror = e => reject(e);
+        });
+        documentText = dataUrl;
+      } else {
+        // For non-image files, you'd need a different extraction method (e.g., PDF parser)
+        // For this prototype, we'll show a message that it's not supported for text extraction
+         toast({
+          title: 'File type not supported for text extraction',
+          description: `Can't extract text from ${file.type}. Please use an image.`,
+        });
+        documentText = "No text could be extracted from this file type.";
+      }
+      
+      // 3. Process with Genkit AI
+      const metadata = await extractDocumentMetadata({ documentText });
+  
+      // 4. Add document metadata to Firestore
       onDocumentAdd({
         owner: metadata.owner,
         company: metadata.documentType === 'Contract' || metadata.documentType === 'Receipt' ? metadata.owner : undefined,
         type: metadata.documentType,
         expiry: metadata.expiryDate,
         keywords: metadata.keywords,
+        fileUrl: downloadURL,
+        fileName: uniqueFileName,
       });
-
+  
       toast({
-        title: 'Document Processed!',
-        description: `Successfully added "${metadata.documentType}" for ${metadata.owner}.`,
+        title: 'Document Uploaded!',
+        description: `Successfully processed and saved "${metadata.documentType}" for ${metadata.owner}.`,
       });
       form.reset();
+      setFileName('');
       setIsOpen(false);
     } catch (error) {
-      console.error('Failed to process document:', error);
+      console.error('Failed to upload document:', error);
       toast({
         variant: 'destructive',
-        title: 'Processing Failed',
-        description: 'Could not extract metadata from the document text.',
+        title: 'Upload Failed',
+        description: 'Could not upload and process the document. Please try again.',
       });
     } finally {
       setIsProcessing(false);
     }
   };
-  
-  const fileRef = form.register("file");
+
+  const fileRef = form.register('file');
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Upload Document</DialogTitle>
           <DialogDescription>
-            Select a file and provide its text content for AI processing.
+            Select a document file to upload. The system will automatically extract its content.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <FormField
               control={form.control}
               name="file"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Document File</FormLabel>
+                  <FormLabel htmlFor="file-upload" className="sr-only">Document File</FormLabel>
                   <FormControl>
-                    <Input type="file" accept="application/pdf,image/*" {...fileRef} />
+                    <div className="flex items-center justify-center w-full">
+                        <label htmlFor="file-upload" className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-lg cursor-pointer bg-card hover:bg-muted/50">
+                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                <FileUp className="w-10 h-10 mb-3 text-muted-foreground" />
+                                {fileName ? (
+                                    <p className="font-semibold text-primary">{fileName}</p>
+                                ) : (
+                                  <>
+                                    <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
+                                    <p className="text-xs text-muted-foreground">PDF, PNG, JPG, etc.</p>
+                                  </>
+                                )}
+                            </div>
+                            <Input id="file-upload" type="file" className="hidden" {...fileRef} onChange={(e) => {
+                                field.onChange(e.target.files);
+                                if (e.target.files && e.target.files.length > 0) {
+                                    setFileName(e.target.files[0].name);
+                                }
+                            }} />
+                        </label>
+                    </div> 
                   </FormControl>
                   <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="documentText"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Document Text (Simulated OCR)</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Paste the text from your document here..."
-                      className="resize-y min-h-[150px]"
-                      {...field}
-                    />
-                  </FormControl>
-                   <FormMessage />
                 </FormItem>
               )}
             />
@@ -127,8 +193,12 @@ export function UploadDialog({ isOpen, setIsOpen, onDocumentAdd }: UploadDialogP
                 </Button>
               </DialogClose>
               <Button type="submit" disabled={isProcessing} className="bg-accent hover:bg-accent/90">
-                {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Process Document
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : "Upload & Process"}
               </Button>
             </DialogFooter>
           </form>

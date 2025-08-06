@@ -13,15 +13,23 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { auth } from '@/lib/firebase';
+import type { User } from 'firebase/auth';
 
 type HeaderProps = {
+  user: User | null | undefined;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
   onUploadClick: () => void;
 };
 
-export default function Header({ searchQuery, setSearchQuery, onUploadClick }: HeaderProps) {
+export default function Header({ user, searchQuery, setSearchQuery, onUploadClick }: HeaderProps) {
   const router = useRouter();
+
+  const handleLogout = async () => {
+    await auth.signOut();
+    router.push('/');
+  };
 
   return (
     <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm md:px-6">
@@ -50,19 +58,19 @@ export default function Header({ searchQuery, setSearchQuery, onUploadClick }: H
           <DropdownMenuTrigger asChild>
             <Button variant="secondary" size="icon" className="rounded-full">
               <Avatar className="h-8 w-8">
-                <AvatarImage src="https://placehold.co/40x40" alt="User Avatar" data-ai-hint="profile picture" />
-                <AvatarFallback>U</AvatarFallback>
+                <AvatarImage src={user?.photoURL || ''} alt={user?.displayName || 'User Avatar'} data-ai-hint="profile picture" />
+                <AvatarFallback>{user?.displayName?.charAt(0) || 'U'}</AvatarFallback>
               </Avatar>
               <span className="sr-only">Toggle user menu</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuLabel>My Account</DropdownMenuLabel>
+            <DropdownMenuLabel>{user?.displayName || 'My Account'}</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem disabled>Profile</DropdownMenuItem>
             <DropdownMenuItem disabled>Settings</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => router.push('/')}>
+            <DropdownMenuItem onClick={handleLogout}>
               <LogOut className="mr-2 h-4 w-4" />
               <span>Log out</span>
             </DropdownMenuItem>

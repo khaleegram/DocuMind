@@ -1,6 +1,6 @@
 export type Document = {
   id: string;
-  fileId: string;
+  userId: string;
   owner: string;
   company?: string;
   type: string;
@@ -8,4 +8,5 @@ export type Document = {
   keywords: string[];
   uploadedAt: string;
   fileUrl: string;
+  fileName: string;
 };

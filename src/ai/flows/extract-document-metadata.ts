@@ -14,7 +14,7 @@ import {z} from 'genkit';
 const ExtractDocumentMetadataInputSchema = z.object({
   documentText: z
     .string()
-    .describe('The text extracted from the document using OCR.'),
+    .describe('The text extracted from the document using OCR or a data URI of an image.'),
 });
 export type ExtractDocumentMetadataInput = z.infer<
   typeof ExtractDocumentMetadataInputSchema
@@ -42,15 +42,21 @@ const prompt = ai.definePrompt({
   output: {schema: ExtractDocumentMetadataOutputSchema},
   prompt: `You are an AI assistant that extracts metadata from documents.
 
-  Given the following text extracted from a document, extract the owner, document type, expiry date, and keywords.
+  The user has provided either text extracted from a document, or a data URI for an image of the document.
+  Your task is to extract the owner, document type, expiry date, and keywords.
 
-  Text: {{{documentText}}}
+  If the input is an image data URI, analyze the image content.
+  If the input is text, analyze the text content.
+
+  Data: {{{documentText}}}
 
   Output the data in JSON format.
   If an expiry date can't be found, set it to null.
   Keywords should be relevant to the content of the document.
+  If the input is an image, use the image to derive the response.
   `,
 });
+
 
 const extractDocumentMetadataFlow = ai.defineFlow(
   {
@@ -59,6 +65,11 @@ const extractDocumentMetadataFlow = ai.defineFlow(
     outputSchema: ExtractDocumentMetadataOutputSchema,
   },
   async input => {
+    
+    const requestPayload = input.documentText.startsWith('data:image')
+    ? { media: { url: input.documentText } }
+    : { text: input.documentText };
+
     const {output} = await prompt(input);
     return output!;
   }
