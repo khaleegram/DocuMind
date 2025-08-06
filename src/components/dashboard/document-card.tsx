@@ -4,7 +4,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { FileText, Calendar, Building, MoreVertical, Link as LinkIcon, Trash2, Loader2, MessageSquare, FileImage, FileType, ChevronDown } from 'lucide-react';
+import { FileText, Calendar, Building, MoreVertical, Link as LinkIcon, Trash2, Loader2, MessageSquare, FileImage, FileType, ChevronDown, Globe } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { format, parseISO } from 'date-fns';
@@ -90,6 +90,12 @@ export function DocumentCard({ document, onDelete }: { document: Document, onDel
             <div className="flex items-center gap-2">
               <Building className="h-4 w-4 shrink-0" />
               <span>{document.company}</span>
+            </div>
+          )}
+           {document.country && (
+            <div className="flex items-center gap-2">
+              <Globe className="h-4 w-4 shrink-0" />
+              <span>{document.country}</span>
             </div>
           )}
           {document.expiry && (

@@ -21,7 +21,7 @@ const categoryDisplayNames: Record<FilterCategory, string> = {
   owner: 'Owners',
   company: 'Companies',
   type: 'Document Types',
-  keywords: 'Keywords',
+  country: 'Countries',
 };
 
 export default function FilterSidebar({ filterOptions, activeFilters, onFilterChange, onClearFilters }: FilterSidebarProps) {
@@ -70,11 +70,11 @@ export default function FilterSidebar({ filterOptions, activeFilters, onFilterCh
           )}
       </div>
       <ScrollArea className="h-full px-2">
-          <Accordion type="multiple" defaultValue={['owner', 'company', 'type', 'keywords']} className="w-full px-2">
+          <Accordion type="multiple" defaultValue={['owner', 'company', 'type', 'country']} className="w-full px-2">
               {renderFilterCategory('owner')}
               {renderFilterCategory('company')}
               {renderFilterCategory('type')}
-              {renderFilterCategory('keywords')}
+              {renderFilterCategory('country')}
           </Accordion>
       </ScrollArea>
     </>

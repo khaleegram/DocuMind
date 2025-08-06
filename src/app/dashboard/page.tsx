@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import type { Document as DocumentType } from '@/lib/types';
 import Header from '@/components/dashboard/header';
 import DocumentList from '@/components/dashboard/document-list';
@@ -15,8 +15,9 @@ import { useToast } from '@/hooks/use-toast';
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { googleProvider } from '@/lib/firebase';
 import FilterSidebar from '@/components/dashboard/filter-sidebar';
+import Fuse from 'fuse.js';
 
-export type FilterCategory = 'owner' | 'type' | 'keywords' | 'company';
+export type FilterCategory = 'owner' | 'type' | 'company' | 'country';
 
 export default function DashboardPage() {
   const [user, loading] = useAuthState(auth);
@@ -24,12 +25,13 @@ export default function DashboardPage() {
   const [documents, setDocuments] = useState<DocumentType[]>([]);
   const [isLoadingDocs, setIsLoadingDocs] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [submittedSearchQuery, setSubmittedSearchQuery] = useState('');
   const [isUploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [activeFilters, setActiveFilters] = useState<Record<FilterCategory, Set<string>>>({
     owner: new Set(),
     type: new Set(),
-    keywords: new Set(),
     company: new Set(),
+    country: new Set(),
   });
   const { toast } = useToast();
 
@@ -64,24 +66,24 @@ export default function DashboardPage() {
     const options: Record<FilterCategory, Set<string>> = {
       owner: new Set(),
       type: new Set(),
-      keywords: new Set(),
       company: new Set(),
+      country: new Set(),
     };
     documents.forEach(doc => {
       if (doc.owner) options.owner.add(doc.owner);
       if (doc.type) options.type.add(doc.type);
       if (doc.company) options.company.add(doc.company);
-      doc.keywords.forEach(k => options.keywords.add(k));
+      if (doc.country) options.country.add(doc.country);
     });
     return {
         owner: Array.from(options.owner).sort(),
         type: Array.from(options.type).sort(),
-        keywords: Array.from(options.keywords).sort(),
         company: Array.from(options.company).sort(),
+        country: Array.from(options.country).sort(),
     }
   }, [documents]);
 
-  const handleFilterChange = (category: FilterCategory, value: string) => {
+  const handleFilterChange = useCallback((category: FilterCategory, value: string) => {
     setActiveFilters(prev => {
         const newSet = new Set(prev[category]);
         if (newSet.has(value)) {
@@ -91,38 +93,38 @@ export default function DashboardPage() {
         }
         return { ...prev, [category]: newSet };
     });
-  };
+  }, []);
   
   const filteredDocuments = useMemo(() => {
     let filtered = documents;
-
-    // Apply text search
-    if (searchQuery) {
-        const lowercasedQuery = searchQuery.toLowerCase();
-        filtered = filtered.filter(doc => 
-            (doc.owner && doc.owner.toLowerCase().includes(lowercasedQuery)) ||
-            (doc.company && doc.company.toLowerCase().includes(lowercasedQuery)) ||
-            (doc.type && doc.type.toLowerCase().includes(lowercasedQuery)) ||
-            (doc.keywords && doc.keywords.some(k => k.toLowerCase().includes(lowercasedQuery)))
-        );
-    }
     
     // Apply sidebar filters
     Object.entries(activeFilters).forEach(([category, values]) => {
         if (values.size > 0) {
             filtered = filtered.filter(doc => {
                 const cat = category as FilterCategory;
-                if (cat === 'keywords') {
-                    return doc.keywords && doc.keywords.some(k => values.has(k));
-                }
                 const docValue = doc[cat];
                 return docValue && values.has(docValue);
             });
         }
     });
 
+    // Apply fuzzy search
+    if (submittedSearchQuery) {
+        const fuse = new Fuse(filtered, {
+            keys: ['owner', 'company', 'type', 'keywords', 'summary', 'textContent'],
+            threshold: 0.4, // Adjust for more or less fuzziness
+            includeScore: true,
+        });
+        filtered = fuse.search(submittedSearchQuery).map(result => result.item);
+    }
+
     return filtered;
-  }, [documents, searchQuery, activeFilters]);
+  }, [documents, submittedSearchQuery, activeFilters]);
+
+  const handleSearchSubmit = () => {
+    setSubmittedSearchQuery(searchQuery);
+  };
 
  const handleDeleteDocument = async (docId: string) => {
     if (!user) return;
@@ -199,12 +201,13 @@ export default function DashboardPage() {
         filterOptions={filterOptions}
         activeFilters={activeFilters}
         onFilterChange={handleFilterChange}
-        onClearFilters={() => setActiveFilters({ owner: new Set(), type: new Set(), keywords: new Set(), company: new Set() })}
+        onClearFilters={() => setActiveFilters({ owner: new Set(), type: new Set(), company: new Set(), country: new Set() })}
       />
       <div className="flex flex-col flex-1 overflow-hidden">
         <Header 
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
+          onSearchSubmit={handleSearchSubmit}
           onUploadClick={() => setUploadDialogOpen(true)}
           title="My Documents"
         />

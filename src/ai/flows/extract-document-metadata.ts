@@ -25,6 +25,7 @@ const ExtractDocumentMetadataOutputSchema = z.object({
   company: z.string().nullable().describe('The name of the company or organization on the document, if any. Use null if not applicable.'),
   documentType: z.string().describe('The type of document (e.g., Passport, Drivers License, Contract, Receipt).'),
   expiryDate: z.string().nullable().describe('The expiration date of the document in YYYY-MM-DD format, or null if not found.'),
+  country: z.string().nullable().describe('The country of origin of the document (e.g., USA, Canada, France). If not found, use null.'),
   keywords: z.array(z.string()).describe('A list of 3-5 relevant keywords for search.'),
   summary: z.string().describe("A concise, one-to-two sentence summary of the document's content."),
 });
@@ -51,6 +52,7 @@ const prompt = ai.definePrompt({
   - **Company:** Identify the company or organization associated with the document. If no company is present, use null.
   - **Document Type:** Determine the type of document (e.g., Passport, Drivers License, Contract, Receipt, Invoice, Utility Bill).
   - **Expiry Date:** Find the expiration date and format it as YYYY-MM-DD. If no expiry date is present, use null.
+  - **Country:** Identify the country of origin for the document. Use the full country name, not an abbreviation. If not found, use null.
   - **Keywords:** Generate 3-5 relevant keywords from the document's content that would be useful for a search (e.g., travel, medical, financial).
   - **Summary:** Provide a brief, one-to-two sentence summary of the document's main content.
 

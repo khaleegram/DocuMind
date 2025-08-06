@@ -252,6 +252,7 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
         textContent: '',
         expiry: null,
         company: null,
+        country: null,
         isProcessing: true,
       });
 
