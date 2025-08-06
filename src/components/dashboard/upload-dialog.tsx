@@ -99,13 +99,14 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
           headers: new Headers({ 'Authorization': 'Bearer ' + accessToken })
       }).then(res => res.json());
 
-      const downloadURL = fileMetadata.thumbnailLink;
+      const isImage = file.type.startsWith('image/');
+      const fileUrl = isImage ? fileMetadata.thumbnailLink : fileMetadata.webViewLink;
 
       // 2. Create a placeholder document in Firestore
       const docRef = await addDoc(collection(db, 'documents'), {
         userId: user.uid,
         fileName: uniqueFileName,
-        fileUrl: downloadURL,
+        fileUrl: fileUrl,
         uploadedAt: serverTimestamp(),
         owner: 'Processing...',
         type: 'Processing...',
@@ -120,7 +121,7 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
       setIsOpen(false);
       
       // Handle AI processing in the background
-      if (file.type.startsWith('image/')) {
+      if (isImage) {
         toast({
           title: 'Upload successful!',
           description: 'Your document is now being processed by the AI.',

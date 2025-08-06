@@ -3,7 +3,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { FileText, Calendar, Building, MoreVertical, Link as LinkIcon, Trash2, Loader2 } from 'lucide-react';
+import { FileText, Calendar, Building, MoreVertical, Link as LinkIcon, Trash2, Loader2, File } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { format, parseISO } from 'date-fns';
@@ -25,6 +25,8 @@ export function DocumentCard({ document, onDelete }: { document: Document, onDel
         return 'document paper';
     }
   }
+
+  const isImage = document.fileUrl && (document.fileUrl.includes('lh3.googleusercontent.com') || !document.fileUrl.startsWith('https'));
 
   if (document.isProcessing) {
     return (
@@ -55,14 +57,20 @@ export function DocumentCard({ document, onDelete }: { document: Document, onDel
     <Card className="flex flex-col overflow-hidden rounded-lg shadow-md transition-shadow hover:shadow-xl">
       <CardHeader className="p-0">
         <div className="aspect-w-4 aspect-h-3">
-          <Image 
-            src={document.fileUrl} 
-            alt={document.type} 
-            width={400} 
-            height={300} 
-            className="object-cover" 
-            data-ai-hint={getAiHint(document.type)}
-          />
+          {isImage ? (
+            <Image 
+              src={document.fileUrl} 
+              alt={document.type} 
+              width={400} 
+              height={300} 
+              className="object-cover" 
+              data-ai-hint={getAiHint(document.type)}
+            />
+          ) : (
+            <div className="bg-muted flex items-center justify-center h-full">
+                <File className="h-20 w-20 text-muted-foreground" />
+            </div>
+          )}
         </div>
       </CardHeader>
       <CardContent className="flex-1 p-4">
@@ -86,7 +94,7 @@ export function DocumentCard({ document, onDelete }: { document: Document, onDel
           )}
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
-          {document.keywords.slice(0, 3).map((keyword) => (
+          {document.keywords.map((keyword) => (
             <Badge key={keyword} variant="secondary">{keyword}</Badge>
           ))}
         </div>
