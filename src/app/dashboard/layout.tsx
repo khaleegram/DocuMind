@@ -10,7 +10,7 @@ import {
   SidebarMenuButton,
   SidebarProvider,
 } from '@/components/ui/sidebar';
-import { Folder, Home, LogOut } from 'lucide-react';
+import { Files, Home, LogOut } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -52,12 +52,26 @@ function MainSidebar() {
               asChild
               isActive={pathname === '/dashboard'}
               tooltip={{
-                children: 'My Documents',
+                children: 'Dashboard',
               }}
             >
               <a href="/dashboard">
                 <Home />
-                <span>My Documents</span>
+                <span>Dashboard</span>
+              </a>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+           <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              isActive={pathname.startsWith('/dashboard/documents')}
+              tooltip={{
+                children: 'All Documents',
+              }}
+            >
+              <a href="/dashboard/documents">
+                <Files />
+                <span>All Documents</span>
               </a>
             </SidebarMenuButton>
           </SidebarMenuItem>
