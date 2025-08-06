@@ -178,20 +178,48 @@ export default function AllDocumentsPage() {
   }, []);
 
   const handleAiSearch = useCallback((criteria: IntelligentSearchOutput) => {
-    const searchTerms = [
-        criteria.owner,
-        criteria.documentType,
-        criteria.country,
-        ...criteria.keywords
-    ].filter(Boolean).join(' ');
+    const { owner, documentType, country, keywords } = criteria;
+    const searchConfig: any[] = [];
+    
+    // Create a query for Fuse.js's extended search ($and, $or)
+    // This allows for more complex, targeted searches.
+    const andQuery: any = { $and: [] };
+
+    if (owner) {
+        andQuery.$and.push({ owner: owner });
+    }
+    if (documentType) {
+        andQuery.$and.push({ type: documentType });
+    }
+    if (country) {
+        andQuery.$and.push({ country: country });
+    }
+
+    // If there are keywords, search them across multiple fields
+    if (keywords && keywords.length > 0) {
+        const keywordQuery = keywords.join(' ');
+        andQuery.$and.push({
+            $or: [
+                { summary: keywordQuery },
+                { textContent: keywordQuery },
+                { keywords: keywordQuery },
+                { company: keywordQuery },
+            ]
+        });
+    }
 
     const fuse = new Fuse(documents, {
         keys: ['owner', 'company', 'type', 'keywords', 'summary', 'textContent', 'country'],
-        threshold: 0.4,
+        threshold: 0.4, // Adjust threshold for desired fuzziness
         includeScore: true,
+        useExtendedSearch: true,
     });
     
-    const results = fuse.search(searchTerms).map(result => result.item);
+    // If there's something to search for, perform the search
+    const results = andQuery.$and.length > 0 
+        ? fuse.search(andQuery).map(result => result.item)
+        : [];
+    
     setAiSearchResults(results);
 
     // Clear manual filters and search to avoid confusion
