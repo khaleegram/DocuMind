@@ -64,9 +64,10 @@ export default function DashboardPage() {
       // Delete firestore document
       await deleteDoc(doc(db, 'documents', docToDelete.id));
 
-      // Delete file from storage
-      const fileRef = ref(storage, `documents/${user.uid}/${docToDelete.fileName}`);
-      await deleteObject(fileRef);
+      // This is a placeholder for file deletion from a real storage provider
+      // For Google Drive, a different API call would be needed
+      console.log(`Deletion requested for file: ${docToDelete.fileName}`);
+      
     } catch (error) {
         console.error("Error deleting document: ", error);
     }

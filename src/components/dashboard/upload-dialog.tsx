@@ -112,6 +112,7 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
       }).then(res => res.json());
 
       const fileUrl = fileMetadata.webViewLink;
+      const thumbnailUrl = fileMetadata.thumbnailLink || null;
 
       if (!fileUrl) {
         throw new Error("Could not get file URL from Google Drive.");
@@ -122,6 +123,8 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
         userId: user.uid,
         fileName: uniqueFileName,
         fileUrl: fileUrl,
+        thumbnailUrl: thumbnailUrl,
+        mimeType: file.type,
         uploadedAt: serverTimestamp(),
         owner: 'Processing...',
         type: 'Processing...',

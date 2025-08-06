@@ -3,8 +3,9 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { FileText, Calendar, Building, MoreVertical, Link as LinkIcon, Trash2, Loader2, File, ChevronDown, MessageSquare } from 'lucide-react';
+import { FileText, Calendar, Building, MoreVertical, Link as LinkIcon, Trash2, Loader2, File, ChevronDown, MessageSquare, FileImage, FileType } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { format, parseISO } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -15,11 +16,31 @@ export function DocumentCard({ document, onDelete }: { document: Document, onDel
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
   const router = useRouter();
 
+  const renderFilePreview = () => {
+    if (document.mimeType?.startsWith('image/') && document.thumbnailUrl) {
+      return (
+         <Image 
+            src={document.thumbnailUrl} 
+            alt={`Preview of ${document.fileName}`}
+            width={200}
+            height={150}
+            className="object-cover w-full h-full" 
+            data-ai-hint="document image"
+        />
+      );
+    }
+    if (document.mimeType === 'application/pdf') {
+      return <FileType className="h-20 w-20 text-muted-foreground" />;
+    }
+    return <FileImage className="h-20 w-20 text-muted-foreground" />;
+  };
+
+
   if (document.isProcessing) {
     return (
       <Card className="flex flex-col overflow-hidden rounded-lg shadow-md">
         <CardHeader className="p-0">
-          <div className="aspect-w-4 aspect-h-3 bg-muted flex items-center justify-center">
+          <div className="aspect-[4/3] bg-muted flex items-center justify-center">
             <Loader2 className="h-10 w-10 animate-spin text-primary" />
           </div>
         </CardHeader>
@@ -54,8 +75,8 @@ export function DocumentCard({ document, onDelete }: { document: Document, onDel
       className="flex flex-col overflow-hidden rounded-lg shadow-md transition-shadow hover:shadow-xl cursor-pointer"
     >
       <CardHeader className="p-0">
-        <div className="aspect-w-4 aspect-h-3 bg-muted flex items-center justify-center h-full">
-          <File className="h-20 w-20 text-muted-foreground" />
+        <div className="aspect-[4/3] bg-muted flex items-center justify-center overflow-hidden">
+          {renderFilePreview()}
         </div>
       </CardHeader>
       <CardContent className="flex-1 p-4">

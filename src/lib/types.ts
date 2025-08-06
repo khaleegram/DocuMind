@@ -12,4 +12,6 @@ export type Document = {
   isProcessing?: boolean;
   summary?: string;
   textContent: string;
+  mimeType: string;
+  thumbnailUrl: string | null;
 };
