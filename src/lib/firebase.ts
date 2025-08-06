@@ -20,6 +20,12 @@ const db = getFirestore(app);
 const storage = getStorage(app);
 const googleProvider = new GoogleAuthProvider();
 googleProvider.addScope('https://www.googleapis.com/auth/drive.file');
+googleProvider.setCustomParameters({
+    'login_hint': 'user@example.com',
+    'prompt': 'consent'
+    });
 
 
 export { app, auth, db, storage, googleProvider };
+
+    
