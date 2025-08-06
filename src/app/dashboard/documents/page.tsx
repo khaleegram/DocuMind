@@ -15,6 +15,7 @@ import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { googleProvider } from '@/lib/firebase';
 import FilterSidebar from '@/components/dashboard/filter-sidebar';
 import Fuse from 'fuse.js';
+import type { IntelligentSearchOutput } from '@/ai/flows/intelligent-search';
 
 export type FilterCategory = 'owner' | 'type' | 'company' | 'country';
 
@@ -162,6 +163,33 @@ export default function AllDocumentsPage() {
     setSubmittedSearchQuery(searchQuery);
   };
 
+  const handleAiSearch = useCallback((criteria: IntelligentSearchOutput) => {
+    const newFilters: Record<FilterCategory, Set<string>> = {
+      owner: new Set(),
+      type: new Set(),
+      company: new Set(),
+      country: new Set(),
+    };
+
+    if (criteria.owner) {
+      const canonicalOwner = findCanonicalName(criteria.owner, new Set(filterOptions.owner.concat(filterOptions.company)));
+      newFilters.owner.add(canonicalOwner);
+    }
+    if (criteria.documentType) {
+      const canonicalType = findCanonicalName(criteria.documentType, new Set(filterOptions.type));
+      newFilters.type.add(canonicalType);
+    }
+    if (criteria.country) {
+      const canonicalCountry = findCanonicalName(criteria.country, new Set(filterOptions.country));
+      newFilters.country.add(canonicalCountry);
+    }
+
+    setActiveFilters(newFilters);
+    setSearchQuery(criteria.keywords.join(' '));
+    setSubmittedSearchQuery(criteria.keywords.join(' '));
+
+  }, [filterOptions]);
+
  const handleDeleteDocument = async (docId: string) => {
     if (!user) return;
     try {
@@ -242,6 +270,7 @@ export default function AllDocumentsPage() {
         activeFilters={activeFilters}
         onFilterChange={handleFilterChange}
         onClearFilters={clearFilters}
+        onAiSearch={handleAiSearch}
       />
       <div className="flex flex-col flex-1 overflow-hidden">
         <Header 
