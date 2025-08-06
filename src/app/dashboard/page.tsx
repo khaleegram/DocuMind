@@ -95,7 +95,7 @@ export default function DashboardPage() {
       const accessToken = credential.accessToken;
 
       // Delete from Google Drive
-      const driveResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${docToDelete.driveFileId}`, {
+      const driveResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${docToDelete.driveFileId}?supportsAllDrives=true`, {
         method: 'DELETE',
         headers: {
           'Authorization': 'Bearer ' + accessToken
@@ -103,12 +103,12 @@ export default function DashboardPage() {
       });
 
       if (!driveResponse.ok) {
-        // Don't throw if file not found (it might have been deleted manually)
-        if (driveResponse.status !== 404) {
-          const errorData = await driveResponse.json().catch(() => ({error: {message: "Could not parse error from Google Drive."}}));
-          console.error('Google Drive deletion error:', errorData);
-          throw new Error(errorData.error.message || 'Failed to delete file from Google Drive.');
+        const errorData = await driveResponse.json().catch(() => ({error: {message: "Could not parse error from Google Drive."}}));
+        console.error('Google Drive deletion error:', errorData);
+        if (driveResponse.status === 404) {
+             throw new Error('File not found on Google Drive. It may have been deleted already.');
         }
+        throw new Error(errorData.error.message || 'Failed to delete file from Google Drive.');
       }
 
       // Delete firestore document
