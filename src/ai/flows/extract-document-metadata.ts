@@ -12,19 +12,19 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const ExtractDocumentMetadataInputSchema = z.object({
-  documentText: z
+  documentDataUrl: z
     .string()
-    .describe('The text extracted from the document using OCR or a data URI of an image.'),
+    .describe('A data URI of an image of the document.'),
 });
 export type ExtractDocumentMetadataInput = z.infer<
   typeof ExtractDocumentMetadataInputSchema
 >;
 
 const ExtractDocumentMetadataOutputSchema = z.object({
-  owner: z.string().describe('The owner of the document (person/company).'),
-  documentType: z.string().describe('The type of document (passport, visa, contract, receipt, etc.).'),
-  expiryDate: z.string().nullable().describe('The expiry date of the document (YYYY-MM-DD), or null if not applicable.'),
-  keywords: z.array(z.string()).describe('Keywords for searching the document.'),
+  owner: z.string().describe('The name of the person or company that owns the document.'),
+  documentType: z.string().describe('The type of document (e.g., Passport, Drivers License, Contract, Receipt).'),
+  expiryDate: z.string().nullable().describe('The expiration date of the document in YYYY-MM-DD format, or null if not found.'),
+  keywords: z.array(z.string()).describe('A list of 3-5 relevant keywords for search.'),
 });
 export type ExtractDocumentMetadataOutput = z.infer<
   typeof ExtractDocumentMetadataOutputSchema
@@ -40,20 +40,17 @@ const prompt = ai.definePrompt({
   name: 'extractDocumentMetadataPrompt',
   input: {schema: ExtractDocumentMetadataInputSchema},
   output: {schema: ExtractDocumentMetadataOutputSchema},
-  prompt: `You are an AI assistant that extracts metadata from documents.
+  prompt: `You are an AI assistant specialized in extracting key information from document images.
+  Analyze the following document image and extract the required metadata.
 
-  The user has provided either text extracted from a document, or a data URI for an image of the document.
-  Your task is to extract the owner, document type, expiry date, and keywords.
+  Image: {{media url=documentDataUrl}}
 
-  If the input is an image data URI, analyze the image content.
-  If the input is text, analyze the text content.
+  - **Owner:** Identify the full name of the person or the primary company name on the document.
+  - **Document Type:** Determine the type of document (e.g., Passport, Drivers License, Contract, Receipt, Invoice).
+  - **Expiry Date:** Find the expiration date and format it as YYYY-MM-DD. If no expiry date is present, use null.
+  - **Keywords:** Generate 3-5 relevant keywords from the document's content that would be useful for a search.
 
-  Data: {{{documentText}}}
-
-  Output the data in JSON format.
-  If an expiry date can't be found, set it to null.
-  Keywords should be relevant to the content of the document.
-  If the input is an image, use the image to derive the response.
+  Return the extracted data in the specified JSON format.
   `,
 });
 
@@ -65,11 +62,6 @@ const extractDocumentMetadataFlow = ai.defineFlow(
     outputSchema: ExtractDocumentMetadataOutputSchema,
   },
   async input => {
-    
-    const requestPayload = input.documentText.startsWith('data:image')
-    ? { media: { url: input.documentText } }
-    : { text: input.documentText };
-
     const {output} = await prompt(input);
     return output!;
   }

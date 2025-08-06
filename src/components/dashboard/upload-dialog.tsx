@@ -17,7 +17,6 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import type { Document } from '@/lib/types';
 import { Loader2, FileUp } from 'lucide-react';
 import { extractDocumentMetadata } from '@/ai/flows/extract-document-metadata';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -40,10 +39,9 @@ const uploadSchema = z.object({
 type UploadDialogProps = {
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
-  onDocumentAdd: (newDocData: Omit<Document, 'id' | 'userId' | 'uploadedAt'>) => void;
 };
 
-export function UploadDialog({ isOpen, setIsOpen }: Omit<UploadDialogProps, 'onDocumentAdd'>) {
+export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [fileName, setFileName] = useState('');
   const { toast } = useToast();
@@ -87,56 +85,52 @@ export function UploadDialog({ isOpen, setIsOpen }: Omit<UploadDialogProps, 'onD
       form.reset();
       setFileName('');
       setIsOpen(false);
-      toast({
-        title: 'Upload Started!',
-        description: 'Your document is being processed.',
-      });
-  
-      // 3. Process with Genkit AI in the background
-      let documentText = '';
+      
+      // Handle AI processing in the background
       if (file.type.startsWith('image/')) {
+        toast({
+          title: 'Upload successful!',
+          description: 'Your document is now being processed by the AI.',
+        });
         const reader = new FileReader();
         reader.readAsDataURL(file);
         const dataUrl = await new Promise<string>((resolve, reject) => {
           reader.onload = e => resolve(e.target?.result as string);
           reader.onerror = e => reject(e);
         });
-        documentText = dataUrl;
+        
+        try {
+          const metadata = await extractDocumentMetadata({ documentDataUrl: dataUrl });
+          await updateDoc(doc(db, 'documents', docRef.id), { ...metadata, isProcessing: false });
+          toast({
+            title: 'Processing Complete!',
+            description: `Successfully analyzed and saved your ${metadata.documentType}.`,
+          });
+        } catch (aiError) {
+          console.error('Failed to process document with AI:', aiError);
+          await updateDoc(doc(db, 'documents', docRef.id), {
+            owner: file.name,
+            type: 'Processing Failed',
+            isProcessing: false,
+          });
+          toast({
+            variant: 'destructive',
+            title: 'AI Processing Failed',
+            description: 'Could not extract metadata from the document.',
+          });
+        }
       } else {
-        documentText = "No text could be extracted from this file type.";
-      }
-      
-      try {
-        const metadata = await extractDocumentMetadata({ documentText });
-    
-        // 4. Update document with extracted metadata
+        // For non-image files like PDFs, just update the placeholder
         await updateDoc(doc(db, 'documents', docRef.id), {
-          owner: metadata.owner,
-          company: metadata.documentType === 'Contract' || metadata.documentType === 'Receipt' ? metadata.owner : undefined,
-          type: metadata.documentType,
-          expiry: metadata.expiryDate,
-          keywords: metadata.keywords,
-          isProcessing: false,
-        });
-    
-        toast({
-          title: 'Document Processed!',
-          description: `Successfully processed and saved "${metadata.documentType}" for ${metadata.owner}.`,
-        });
-      } catch (aiError) {
-        console.error('Failed to process document with AI:', aiError);
-        await updateDoc(doc(db, 'documents', docRef.id), {
-          owner: 'Processing Failed',
-          type: 'Error',
+          owner: file.name,
+          type: 'PDF Document',
           isProcessing: false,
         });
         toast({
-          variant: 'destructive',
-          title: 'Processing Failed',
-          description: 'Could not extract metadata from the document.',
+          title: 'Upload successful!',
+          description: `${file.name} was saved. PDF analysis is not yet supported.`,
         });
       }
-
     } catch (error) {
       console.error('Failed to upload document:', error);
       toast({
@@ -153,10 +147,12 @@ export function UploadDialog({ isOpen, setIsOpen }: Omit<UploadDialogProps, 'onD
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
-      setIsOpen(open);
-      if (!open) {
-        form.reset();
-        setFileName('');
+      if (!isProcessing) {
+        setIsOpen(open);
+        if (!open) {
+          form.reset();
+          setFileName('');
+        }
       }
     }}>
       <DialogContent className="sm:max-w-md">
