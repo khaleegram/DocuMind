@@ -20,7 +20,7 @@ const IntelligentSearchOutputSchema = z.object({
   owner: z.string().nullable().describe('The identified owner (person or company) to filter by, if any.'),
   documentType: z.string().nullable().describe('The identified document type to filter by, if any.'),
   country: z.string().nullable().describe('The identified country to filter by, if any.'),
-  keywords: z.array(z.string()).describe('A list of general keywords from the query to search for in the document content.'),
+  keywords: z.array(z.string()).describe('A list of general keywords from the query to search for in the document content, summary, or other metadata.'),
 });
 export type IntelligentSearchOutput = z.infer<typeof IntelligentSearchOutputSchema>;
 
@@ -36,11 +36,11 @@ const prompt = ai.definePrompt({
 
 Analyze the user's query and extract the following entities:
 - The primary owner of the document (this could be a person's name or a company name).
-- The type of document (e.g., "Passport", "Receipt", "Contract").
+- The type of document (e.g., "Passport", "Receipt", "Contract", "Visa").
 - The country associated with the document.
-- Any remaining words in the query that should be treated as general search keywords.
+- Any remaining words in the query that should be treated as general search keywords. These keywords can be used to search against the document's content, summary, and any other metadata.
 
-Return the extracted information in the specified JSON format. If a specific entity is not found in the query, return null for that field.
+Return the extracted information in the specified JSON format. If a specific entity is not found in the query, return null for that field. Be liberal with keywords.
 
 User Query:
 "{{{query}}}"

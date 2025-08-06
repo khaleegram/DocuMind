@@ -136,14 +136,12 @@ export default function DashboardLayout({
 }) {
   return (
     <SidebarProvider>
-        <div className="flex min-h-screen w-full flex-col bg-muted/40">
-            <MainSidebar />
-            <main className="flex flex-col sm:pl-14 flex-1">
-                 <div className="flex-1">
-                    {children}
-                </div>
-            </main>
+      <div className="flex min-h-screen w-full bg-muted/40">
+        <MainSidebar />
+        <div className="flex flex-col flex-1 w-full">
+          {children}
         </div>
+      </div>
     </SidebarProvider>
   );
 }
