@@ -12,37 +12,12 @@ import {
 } from '@/components/ui/sidebar';
 import { Files, Folder, Home, LogOut } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { auth } from '@/lib/firebase';
-import { useAuthState } from 'react-firebase-hooks/auth';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useState, useEffect } from 'react';
+
 
 function MainSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const [user, loading] = useAuthState(auth);
-  const [initial, setInitial] = useState('');
-
-  useEffect(() => {
-    if (user && !loading) {
-      setInitial(user.displayName?.charAt(0)?.toUpperCase() || '');
-    }
-  }, [user, loading]);
-
-  const handleLogout = async () => {
-    await auth.signOut();
-    router.push('/');
-  };
-
+  
   return (
     <Sidebar
       collapsible="icon"
@@ -87,42 +62,7 @@ function MainSidebar() {
         </SidebarMenu>
       </SidebarContent>
       <SidebarFooter>
-         <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <div className="flex items-center gap-3 p-4 cursor-pointer hover:bg-muted/50 rounded-md">
-                     <Avatar className="h-8 w-8">
-                        {user && <AvatarImage src={user.photoURL || ''} alt={user.displayName || 'User Avatar'} data-ai-hint="profile picture" />}
-                        <AvatarFallback>
-                           {loading || !initial ? <Skeleton className="h-8 w-8 rounded-full" /> : initial}
-                        </AvatarFallback>
-                    </Avatar>
-                    <div className="flex flex-col group-data-[collapsible=icon]:hidden truncate">
-                       {loading ? (
-                         <div className="space-y-1">
-                           <Skeleton className="h-4 w-24" />
-                           <Skeleton className="h-3 w-32" />
-                         </div>
-                       ) : (
-                         <>
-                           <span className="text-sm font-semibold truncate">{user?.displayName}</span>
-                           <span className="text-xs text-muted-foreground truncate">{user?.email}</span>
-                         </>
-                       )}
-                    </div>
-                </div>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" side="top" className="mb-2 w-56">
-                <DropdownMenuLabel>{user?.displayName || 'My Account'}</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem disabled>Profile</DropdownMenuItem>
-                <DropdownMenuItem disabled>Settings</DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout}>
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Log out</span>
-                </DropdownMenuItem>
-            </DropdownMenuContent>
-        </DropdownMenu>
+        {/* User profile moved to header */}
       </SidebarFooter>
     </Sidebar>
   );

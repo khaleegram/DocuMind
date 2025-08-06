@@ -9,17 +9,14 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import type { FilterCategory } from '@/app/dashboard/documents/page';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Filter, Search, X, Sparkles, Loader2 } from 'lucide-react';
+import { Filter, Search, X } from 'lucide-react';
 import Fuse from 'fuse.js';
-import { intelligentSearch, type IntelligentSearchOutput } from '@/ai/flows/intelligent-search';
-import { useToast } from '@/hooks/use-toast';
 
 type FilterSidebarProps = {
   filterOptions: Record<FilterCategory, string[]>;
   activeFilters: Record<FilterCategory, Set<string>>;
   onFilterChange: (category: FilterCategory, value: string) => void;
   onClearFilters: () => void;
-  onAiSearch: (criteria: IntelligentSearchOutput) => void;
 };
 
 const categoryDisplayNames: Record<FilterCategory, string> = {
@@ -28,61 +25,6 @@ const categoryDisplayNames: Record<FilterCategory, string> = {
   type: 'Document Types',
   country: 'Countries',
 };
-
-function AiSearchAgent({ onAiSearch }: { onAiSearch: (criteria: IntelligentSearchOutput) => void }) {
-    const [query, setQuery] = useState('');
-    const [isSearching, setIsSearching] = useState(false);
-    const { toast } = useToast();
-
-    const handleSearch = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!query.trim()) return;
-
-        setIsSearching(true);
-        try {
-            const result = await intelligentSearch({ query });
-            onAiSearch(result);
-        } catch (error) {
-            console.error("AI search failed:", error);
-            toast({
-                variant: 'destructive',
-                title: 'AI Search Failed',
-                description: 'Could not perform the intelligent search. Please try a different query.'
-            })
-        } finally {
-            setIsSearching(false);
-        }
-    }
-    
-    return (
-        <div className="p-4 border-b">
-            <form onSubmit={handleSearch}>
-                <label className="text-sm font-semibold flex items-center gap-2 mb-2">
-                    <Sparkles className="h-4 w-4 text-accent" />
-                    AI Search Agent
-                </label>
-                 <div className="relative">
-                    <Input 
-                        placeholder="e.g., 'Danish visa for John Doe'"
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        disabled={isSearching}
-                        className="pr-10"
-                    />
-                    <Button 
-                      type="submit" 
-                      size="icon" 
-                      variant="ghost" 
-                      className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
-                      disabled={isSearching || !query.trim()}
-                    >
-                        {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                    </Button>
-                </div>
-            </form>
-        </div>
-    )
-}
 
 function FilterCategorySection({
     category,
@@ -145,15 +87,14 @@ function FilterCategorySection({
     );
 }
 
-export default function FilterSidebar({ filterOptions, activeFilters, onFilterChange, onClearFilters, onAiSearch }: FilterSidebarProps) {
+export default function FilterSidebar({ filterOptions, activeFilters, onFilterChange, onClearFilters }: FilterSidebarProps) {
   const [isSheetOpen, setSheetOpen] = useState(false);
   const activeFilterCount = Object.values(activeFilters).reduce((acc, set) => acc + set.size, 0);
 
   const FilterContent = () => (
     <>
-      <AiSearchAgent onAiSearch={onAiSearch} />
       <div className="flex items-center justify-between px-4 pt-4 pb-2">
-          <h2 className="text-lg font-semibold tracking-tight">Manual Filters</h2>
+          <h2 className="text-lg font-semibold tracking-tight">Filters</h2>
           {activeFilterCount > 0 && (
             <Button variant="link" className="p-0 h-auto text-sm text-destructive" onClick={onClearFilters}>
                 Clear all ({activeFilterCount})

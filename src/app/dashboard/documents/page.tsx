@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -270,7 +271,6 @@ export default function AllDocumentsPage() {
         activeFilters={activeFilters}
         onFilterChange={handleFilterChange}
         onClearFilters={clearFilters}
-        onAiSearch={handleAiSearch}
       />
       <div className="flex flex-col flex-1 overflow-hidden">
         <Header 
@@ -278,7 +278,9 @@ export default function AllDocumentsPage() {
           setSearchQuery={setSearchQuery}
           onSearchSubmit={handleSearchSubmit}
           onUploadClick={() => setUploadDialogOpen(true)}
+          onAiSearch={handleAiSearch}
           title="All Documents"
+          showAiSearch={true}
         />
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
           {isLoadingDocs ? (
