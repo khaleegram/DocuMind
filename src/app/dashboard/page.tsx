@@ -9,7 +9,7 @@ import { UploadDialog } from '@/components/dashboard/upload-dialog';
 import { auth, db, storage, googleProvider } from '@/lib/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { useRouter } from 'next/navigation';
-import { collection, query, where, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, deleteDoc, doc, getDoc } from 'firebase/firestore';
 import { ref, deleteObject } from 'firebase/storage';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -34,21 +34,21 @@ export default function DashboardPage() {
     setIsLoadingDocs(true);
     const q = query(collection(db, 'documents'), where('userId', '==', user.uid));
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const docs: DocumentType[] = [];
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        docs.push({ 
-          id: doc.id, 
-          ...data,
-          uploadedAt: data.uploadedAt?.toDate().toISOString() || new Date().toISOString(),
-        } as DocumentType);
-      });
-      setDocuments(docs.sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()));
-      setIsLoadingDocs(false);
+        const docs: DocumentType[] = [];
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            docs.push({
+                id: doc.id,
+                ...data,
+                uploadedAt: data.uploadedAt?.toDate ? data.uploadedAt.toDate().toISOString() : new Date().toISOString(),
+            } as DocumentType);
+        });
+        setDocuments(docs.sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()));
+        setIsLoadingDocs(false);
     });
 
     return () => unsubscribe();
-  }, [user, loading, router]);
+}, [user, loading, router]);
 
 
   const filteredDocuments = useMemo(() => {
@@ -106,9 +106,11 @@ export default function DashboardPage() {
         const errorData = await driveResponse.json().catch(() => ({error: {message: "Could not parse error from Google Drive."}}));
         console.error('Google Drive deletion error:', errorData);
         if (driveResponse.status === 404) {
-             throw new Error('File not found on Google Drive. It may have been deleted already.');
+             // We treat 404 as a success because the file is already gone.
+             console.warn('File not found on Google Drive during deletion, but proceeding.');
+        } else {
+            throw new Error(errorData.error.message || 'Failed to delete file from Google Drive.');
         }
-        throw new Error(errorData.error.message || 'Failed to delete file from Google Drive.');
       }
 
       // Delete firestore document
