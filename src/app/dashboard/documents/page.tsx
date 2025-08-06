@@ -42,6 +42,7 @@ export default function AllDocumentsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [submittedSearchQuery, setSubmittedSearchQuery] = useState('');
   const [isUploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [aiSearchResults, setAiSearchResults] = useState<DocumentType[] | null>(null);
   const [activeFilters, setActiveFilters] = useState<Record<FilterCategory, Set<string>>>({
     owner: new Set(),
     type: new Set(),
@@ -115,6 +116,7 @@ export default function AllDocumentsPage() {
   }, [documents]);
 
   const handleFilterChange = useCallback((category: FilterCategory, value: string) => {
+    setAiSearchResults(null); // Clear AI results when manual filters change
     setActiveFilters(prev => {
         const newSet = new Set(prev[category]);
         if (newSet.has(value)) {
@@ -126,7 +128,12 @@ export default function AllDocumentsPage() {
     });
   }, []);
   
-  const filteredDocuments = useMemo(() => {
+  const displayedDocuments = useMemo(() => {
+    // If there are AI search results, show them.
+    if (aiSearchResults !== null) {
+      return aiSearchResults;
+    }
+
     let filtered = documents;
     
     // Apply sidebar filters with fuzzy matching for document values
@@ -158,38 +165,36 @@ export default function AllDocumentsPage() {
     }
 
     return filtered;
-  }, [documents, submittedSearchQuery, activeFilters]);
+  }, [documents, submittedSearchQuery, activeFilters, aiSearchResults]);
 
   const handleSearchSubmit = () => {
+    setAiSearchResults(null); // Clear AI results on manual search
     setSubmittedSearchQuery(searchQuery);
   };
 
   const handleAiSearch = useCallback((criteria: IntelligentSearchOutput) => {
-    const newFilters: Record<FilterCategory, Set<string>> = {
-      owner: new Set(),
-      type: new Set(),
-      company: new Set(),
-      country: new Set(),
-    };
+    const searchTerms = [
+        criteria.owner,
+        criteria.documentType,
+        criteria.country,
+        ...criteria.keywords
+    ].filter(Boolean).join(' ');
 
-    if (criteria.owner) {
-      const canonicalOwner = findCanonicalName(criteria.owner, new Set(filterOptions.owner.concat(filterOptions.company)));
-      newFilters.owner.add(canonicalOwner);
-    }
-    if (criteria.documentType) {
-      const canonicalType = findCanonicalName(criteria.documentType, new Set(filterOptions.type));
-      newFilters.type.add(canonicalType);
-    }
-    if (criteria.country) {
-      const canonicalCountry = findCanonicalName(criteria.country, new Set(filterOptions.country));
-      newFilters.country.add(canonicalCountry);
-    }
+    const fuse = new Fuse(documents, {
+        keys: ['owner', 'company', 'type', 'keywords', 'summary', 'textContent', 'country'],
+        threshold: 0.4,
+        includeScore: true,
+    });
+    
+    const results = fuse.search(searchTerms).map(result => result.item);
+    setAiSearchResults(results);
 
-    setActiveFilters(newFilters);
-    setSearchQuery(criteria.keywords.join(' '));
-    setSubmittedSearchQuery(criteria.keywords.join(' '));
+    // Clear manual filters and search to avoid confusion
+    clearFilters();
+    setSearchQuery('');
+    setSubmittedSearchQuery('');
 
-  }, [filterOptions]);
+  }, [documents, clearFilters]);
 
  const handleDeleteDocument = async (docId: string) => {
     if (!user) return;
@@ -254,6 +259,7 @@ export default function AllDocumentsPage() {
   
   const clearFilters = useCallback(() => {
     setActiveFilters({ owner: new Set(), type: new Set(), company: new Set(), country: new Set() });
+    setAiSearchResults(null);
   }, []);
 
   if (loading || (!user && !loading)) {
@@ -271,6 +277,7 @@ export default function AllDocumentsPage() {
         activeFilters={activeFilters}
         onFilterChange={handleFilterChange}
         onClearFilters={clearFilters}
+        isAiSearchActive={aiSearchResults !== null}
       />
       <div className="flex flex-col flex-1 overflow-hidden">
         <Header 
@@ -288,7 +295,7 @@ export default function AllDocumentsPage() {
               <Loader2 className="h-16 w-16 animate-spin text-primary" />
             </div>
           ) : (
-            <DocumentList documents={filteredDocuments} onDelete={handleDeleteDocument} />
+            <DocumentList documents={displayedDocuments} onDelete={handleDeleteDocument} />
           )}
         </main>
       </div>

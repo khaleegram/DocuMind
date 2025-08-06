@@ -17,6 +17,7 @@ type FilterSidebarProps = {
   activeFilters: Record<FilterCategory, Set<string>>;
   onFilterChange: (category: FilterCategory, value: string) => void;
   onClearFilters: () => void;
+  isAiSearchActive: boolean;
 };
 
 const categoryDisplayNames: Record<FilterCategory, string> = {
@@ -87,7 +88,7 @@ function FilterCategorySection({
     );
 }
 
-export default function FilterSidebar({ filterOptions, activeFilters, onFilterChange, onClearFilters }: FilterSidebarProps) {
+export default function FilterSidebar({ filterOptions, activeFilters, onFilterChange, onClearFilters, isAiSearchActive }: FilterSidebarProps) {
   const [isSheetOpen, setSheetOpen] = useState(false);
   const activeFilterCount = Object.values(activeFilters).reduce((acc, set) => acc + set.size, 0);
 
@@ -95,19 +96,26 @@ export default function FilterSidebar({ filterOptions, activeFilters, onFilterCh
     <>
       <div className="flex items-center justify-between px-4 pt-4 pb-2">
           <h2 className="text-lg font-semibold tracking-tight">Filters</h2>
-          {activeFilterCount > 0 && (
+          {(activeFilterCount > 0 || isAiSearchActive) && (
             <Button variant="link" className="p-0 h-auto text-sm text-destructive" onClick={onClearFilters}>
-                Clear all ({activeFilterCount})
+                Clear all
             </Button>
           )}
       </div>
       <ScrollArea className="h-full">
-          <Accordion type="multiple" defaultValue={['owner', 'company', 'type', 'country']} className="w-full px-2">
-              <FilterCategorySection category="owner" options={filterOptions.owner} activeOptions={activeFilters.owner} onFilterChange={onFilterChange} />
-              <FilterCategorySection category="company" options={filterOptions.company} activeOptions={activeFilters.company} onFilterChange={onFilterChange} />
-              <FilterCategorySection category="type" options={filterOptions.type} activeOptions={activeFilters.type} onFilterChange={onFilterChange} />
-              <FilterCategorySection category="country" options={filterOptions.country} activeOptions={activeFilters.country} onFilterChange={onFilterChange} />
-          </Accordion>
+         {isAiSearchActive ? (
+            <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+                <p className="font-semibold">AI Search Active</p>
+                <p>Clear results to use manual filters.</p>
+            </div>
+         ) : (
+            <Accordion type="multiple" defaultValue={['owner', 'company', 'type', 'country']} className="w-full px-2">
+                <FilterCategorySection category="owner" options={filterOptions.owner} activeOptions={activeFilters.owner} onFilterChange={onFilterChange} />
+                <FilterCategorySection category="company" options={filterOptions.company} activeOptions={activeFilters.company} onFilterChange={onFilterChange} />
+                <FilterCategorySection category="type" options={filterOptions.type} activeOptions={activeFilters.type} onFilterChange={onFilterChange} />
+                <FilterCategorySection category="country" options={filterOptions.country} activeOptions={activeFilters.country} onFilterChange={onFilterChange} />
+            </Accordion>
+         )}
       </ScrollArea>
     </>
   )
@@ -126,9 +134,9 @@ export default function FilterSidebar({ filterOptions, activeFilters, onFilterCh
                     <Button size="icon" className="rounded-full w-14 h-14 shadow-lg bg-primary hover:bg-primary/90">
                        <Filter className="h-6 w-6" />
                        <span className="sr-only">Open Filters</span>
-                       {activeFilterCount > 0 && (
+                       {(activeFilterCount > 0 || isAiSearchActive) && (
                             <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-xs font-bold text-destructive-foreground">
-                                {activeFilterCount}
+                                {isAiSearchActive ? 'AI' : activeFilterCount}
                             </span>
                         )}
                     </Button>
