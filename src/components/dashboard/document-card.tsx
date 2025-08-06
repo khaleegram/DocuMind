@@ -3,7 +3,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { FileText, Calendar, Building, MoreVertical, Link as LinkIcon, Trash2, Loader2, File, ChevronDown, MessageSquare, FileImage, FileType } from 'lucide-react';
+import { FileText, Calendar, Building, MoreVertical, Link as LinkIcon, Trash2, Loader2, MessageSquare, FileImage, FileType, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { format, parseISO } from 'date-fns';
@@ -62,8 +62,7 @@ export function DocumentCard({ document, onDelete }: { document: Document, onDel
   }
 
   const handleCardClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    // Prevent navigation when clicking on interactive elements
-    if ((e.target as HTMLElement).closest('button, a, [role="menuitem"]')) {
+    if ((e.target as HTMLElement).closest('button, a, [role="menuitem"], [data-collapsible-trigger]')) {
       return;
     }
     router.push(`/dashboard/document/${document.id}`);
@@ -100,20 +99,17 @@ export function DocumentCard({ document, onDelete }: { document: Document, onDel
           )}
         </div>
         {document.summary && (
-          <Collapsible open={isSummaryOpen} onOpenChange={setIsSummaryOpen} onClick={(e) => e.stopPropagation()} className="mt-4 text-sm">
-            <p className={`text-muted-foreground ${!isSummaryOpen ? 'truncate' : ''}`}>
-              {document.summary}
-            </p>
-            <CollapsibleTrigger asChild>
-              <Button variant="link" className="p-0 h-auto text-xs text-accent">
-                {isSummaryOpen ? 'Read Less' : 'Read More'}
-                <ChevronDown className={`ml-1 h-3 w-3 transition-transform ${isSummaryOpen ? 'rotate-180' : ''}`} />
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <p className="text-muted-foreground mt-2">{document.summary}</p>
-            </CollapsibleContent>
-          </Collapsible>
+            <Collapsible open={isSummaryOpen} onOpenChange={setIsSummaryOpen} className="mt-4 text-sm">
+                <CollapsibleContent className="space-y-2">
+                     <p className="text-muted-foreground">{document.summary}</p>
+                </CollapsibleContent>
+                <CollapsibleTrigger asChild>
+                    <Button variant="link" className="p-0 h-auto text-xs text-accent" data-collapsible-trigger>
+                        {isSummaryOpen ? 'Read Less' : 'Read More'}
+                        <ChevronDown className={`ml-1 h-3 w-3 transition-transform ${isSummaryOpen ? 'rotate-180' : ''}`} />
+                    </Button>
+                </CollapsibleTrigger>
+            </Collapsible>
         )}
         <div className="mt-4 flex flex-wrap gap-2">
           {document.keywords.map((keyword) => (
