@@ -85,7 +85,7 @@ function MainSidebar() {
                      <Avatar className="h-8 w-8">
                         {user && <AvatarImage src={user.photoURL || ''} alt={user.displayName || 'User Avatar'} data-ai-hint="profile picture" />}
                         <AvatarFallback>
-                           {loading ? <Skeleton className="h-8 w-8 rounded-full" /> : (user?.displayName?.charAt(0)?.toUpperCase() || 'U')}
+                           {loading ? <Skeleton className="h-8 w-8 rounded-full" /> : (user ? user.displayName?.charAt(0)?.toUpperCase() : '')}
                         </AvatarFallback>
                     </Avatar>
                     <div className="flex flex-col group-data-[collapsible=icon]:hidden truncate">
