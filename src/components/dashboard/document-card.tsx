@@ -26,7 +26,7 @@ export function DocumentCard({ document, onDelete }: { document: Document, onDel
     }
   }
 
-  const isImage = document.fileUrl && (document.fileUrl.includes('lh3.googleusercontent.com') || !document.fileUrl.startsWith('https'));
+  const isImage = document.fileUrl && !document.fileUrl.includes('drive.google.com');
 
   if (document.isProcessing) {
     return (

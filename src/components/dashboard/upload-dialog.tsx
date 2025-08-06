@@ -19,6 +19,8 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, FileUp } from 'lucide-react';
 import { extractDocumentMetadata } from '@/ai/flows/extract-document-metadata';
+import { enhanceSearchWithKeywords } from '@/ai/flows/enhance-search-with-keywords';
+import { extractTextFromImage } from '@/ai/flows/extract-text-from-image';
 import { auth, db } from '@/lib/firebase';
 import { v4 as uuidv4 } from 'uuid';
 import { doc, addDoc, collection, serverTimestamp, updateDoc } from 'firebase/firestore';
@@ -134,8 +136,16 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
         });
         
         try {
-          const metadata = await extractDocumentMetadata({ documentDataUrl: dataUrl });
-          await updateDoc(doc(db, 'documents', docRef.id), { ...metadata, isProcessing: false });
+          // concurrently run metadata extraction and keyword generation
+          const [metadata, textExtraction] = await Promise.all([
+            extractDocumentMetadata({ documentDataUrl: dataUrl }),
+            extractTextFromImage({ documentDataUrl: dataUrl }),
+          ]);
+
+          const { keywords } = await enhanceSearchWithKeywords({ documentText: textExtraction.text });
+          
+          await updateDoc(doc(db, 'documents', docRef.id), { ...metadata, keywords, isProcessing: false });
+
           toast({
             title: 'Processing Complete!',
             description: `Successfully analyzed and saved your ${metadata.documentType}.`,
@@ -158,6 +168,7 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
         await updateDoc(doc(db, 'documents', docRef.id), {
           owner: file.name,
           type: 'PDF Document',
+          keywords: [file.name.split('.')[0]],
           isProcessing: false,
         });
         toast({
