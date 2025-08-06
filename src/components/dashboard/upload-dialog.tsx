@@ -25,7 +25,7 @@ import { extractTextFromImage } from '@/ai/flows/extract-text-from-image';
 import { auth, db, googleProvider } from '@/lib/firebase';
 import { v4 as uuidv4 } from 'uuid';
 import { doc, addDoc, collection, serverTimestamp, updateDoc, query, where, getDocs, setDoc } from 'firebase/firestore';
-import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { signInWithPopup, GoogleAuthProvider, reauthenticateWithPopup } from 'firebase/auth';
 
 
 const uploadSchema = z.object({
@@ -256,7 +256,7 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
     const files = Array.from(values.files) as File[];
 
     try {
-      const result = await signInWithPopup(auth, googleProvider);
+      const result = await reauthenticateWithPopup(user, googleProvider);
       const credential = GoogleAuthProvider.credentialFromResult(result);
       if (!credential || !credential.accessToken) {
         throw new Error("Could not retrieve a valid access token. Please sign in again.");
@@ -286,6 +286,8 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
       let description = 'Could not upload the document. Please try again.';
       if (error.code === 'auth/popup-closed-by-user') {
         description = 'The authentication popup was closed. Please try uploading again.';
+      } else if (error.code === 'auth/cancelled-popup-request' || error.code === 'auth/popup-blocked') {
+        description = 'The authentication popup was blocked or cancelled. Please allow popups for this site and try again.';
       } else if (error.message) {
         description = error.message;
       }
