@@ -4,7 +4,6 @@
 import { Search, Upload } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { SidebarTrigger } from '@/components/ui/sidebar';
 
 type HeaderProps = {
   searchQuery: string;
@@ -23,13 +22,9 @@ export default function Header({ searchQuery, setSearchQuery, onSearchSubmit, on
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/95 px-4 backdrop-blur-sm sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 sm:py-4">
-       <div className="lg:hidden">
-          <SidebarTrigger />
-       </div>
-      
       <div className="flex w-full items-center gap-4">
         <h1 className="flex-1 shrink-0 text-2xl font-semibold hidden md:block whitespace-nowrap">{title}</h1>
-        <div className="relative flex-1 ml-auto sm:flex-grow-0">
+        <form onSubmit={(e) => { e.preventDefault(); onSearchSubmit(); }} className="relative flex-1 ml-auto sm:flex-grow-0">
           <Input
             type="search"
             placeholder="Search documents..."
@@ -43,12 +38,11 @@ export default function Header({ searchQuery, setSearchQuery, onSearchSubmit, on
             type="submit" 
             size="icon" 
             className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
-            onClick={onSearchSubmit}
             aria-label="Submit search"
             >
             <Search className="h-4 w-4" />
           </Button>
-        </div>
+        </form>
         <Button onClick={onUploadClick} className="bg-accent hover:bg-accent/90 h-10">
           <Upload className="mr-0 sm:mr-2 h-4 w-4" /> 
           <span className="hidden sm:inline">Upload</span>

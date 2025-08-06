@@ -1,14 +1,16 @@
 
 'use client';
 
+import { useState, useMemo } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import type { FilterCategory } from '@/app/dashboard/page';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Filter, X } from 'lucide-react';
-import { useState } from 'react';
+import { Filter, Search, X } from 'lucide-react';
+import Fuse from 'fuse.js';
 
 type FilterSidebarProps = {
   filterOptions: Record<FilterCategory, string[]>;
@@ -24,57 +26,87 @@ const categoryDisplayNames: Record<FilterCategory, string> = {
   country: 'Countries',
 };
 
+function FilterCategorySection({
+    category,
+    options,
+    activeOptions,
+    onFilterChange
+}: {
+    category: FilterCategory;
+    options: string[];
+    activeOptions: Set<string>;
+    onFilterChange: (category: FilterCategory, value: string) => void;
+}) {
+    const [search, setSearch] = useState('');
+
+    const filteredOptions = useMemo(() => {
+        if (!search) return options;
+        const fuse = new Fuse(options, { threshold: 0.3 });
+        return fuse.search(search).map(result => result.item);
+    }, [search, options]);
+
+    if (options.length === 0) return null;
+
+    return (
+        <AccordionItem value={category} key={category}>
+            <AccordionTrigger className="text-base font-semibold hover:no-underline">
+                {categoryDisplayNames[category]}
+            </AccordionTrigger>
+            <AccordionContent>
+                <div className="space-y-4 px-1">
+                    <div className="relative">
+                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input 
+                            placeholder={`Search ${categoryDisplayNames[category]}...`}
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="pl-8 h-9"
+                        />
+                    </div>
+                    <ScrollArea className="h-full max-h-48">
+                        <div className="space-y-3 pr-4">
+                            {filteredOptions.length > 0 ? filteredOptions.map((option) => (
+                                <div key={option} className="flex items-center space-x-2">
+                                    <Checkbox
+                                        id={`${category}-${option}`}
+                                        checked={activeOptions.has(option)}
+                                        onCheckedChange={() => onFilterChange(category, option)}
+                                    />
+                                    <label htmlFor={`${category}-${option}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-1 truncate">
+                                        {option}
+                                    </label>
+                                </div>
+                            )) : (
+                                <p className="text-sm text-muted-foreground text-center py-4">No matches found.</p>
+                            )}
+                        </div>
+                    </ScrollArea>
+                </div>
+            </AccordionContent>
+        </AccordionItem>
+    );
+}
+
 export default function FilterSidebar({ filterOptions, activeFilters, onFilterChange, onClearFilters }: FilterSidebarProps) {
   const [isSheetOpen, setSheetOpen] = useState(false);
   const activeFilterCount = Object.values(activeFilters).reduce((acc, set) => acc + set.size, 0);
 
-  const renderFilterCategory = (category: FilterCategory) => {
-    const options = filterOptions[category];
-    if (options.length === 0) return null;
-
-    return (
-      <AccordionItem value={category} key={category}>
-        <AccordionTrigger className="text-base font-semibold">
-          {categoryDisplayNames[category]}
-        </AccordionTrigger>
-        <AccordionContent>
-          <ScrollArea className="h-full max-h-60">
-            <div className="space-y-3 pr-4">
-              {options.map((option) => (
-                <div key={option} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`${category}-${option}`}
-                    checked={activeFilters[category].has(option)}
-                    onCheckedChange={() => onFilterChange(category, option)}
-                  />
-                  <label htmlFor={`${category}-${option}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-1 truncate">
-                    {option}
-                  </label>
-                </div>
-              ))}
-            </div>
-          </ScrollArea>
-        </AccordionContent>
-      </AccordionItem>
-    );
-  };
-  
   const FilterContent = () => (
     <>
-      <div className="flex items-center justify-between px-4 sm:px-6 pt-6 pb-2">
+      <div className="flex items-center justify-between px-4 pt-6 pb-2">
           <h2 className="text-lg font-semibold tracking-tight">Filters</h2>
           {activeFilterCount > 0 && (
-            <Button variant="link" className="p-0 h-auto text-sm" onClick={onClearFilters}>
-                Clear all
+            <Button variant="link" className="p-0 h-auto text-sm text-destructive" onClick={onClearFilters}>
+                Clear all ({activeFilterCount})
             </Button>
           )}
       </div>
-      <ScrollArea className="h-full px-2">
+      <ScrollArea className="h-full">
           <Accordion type="multiple" defaultValue={['owner', 'company', 'type', 'country']} className="w-full px-2">
-              {renderFilterCategory('owner')}
-              {renderFilterCategory('company')}
-              {renderFilterCategory('type')}
-              {renderFilterCategory('country')}
+              <FilterCategorySection category="owner" options={filterOptions.owner} activeOptions={activeFilters.owner} onFilterChange={onFilterChange} />
+              <FilterCategorySection category="company" options={filterOptions.company} activeOptions={activeFilters.company} onFilterChange={onFilterChange} />
+              <FilterCategorySection category="type" options={filterOptions.type} activeOptions={activeFilters.type} onFilterChange={onFilterChange} />
+              <FilterCategorySection category="country" options={filterOptions.country} activeOptions={activeFilters.country} onFilterChange={onFilterChange} />
           </Accordion>
       </ScrollArea>
     </>
@@ -83,7 +115,7 @@ export default function FilterSidebar({ filterOptions, activeFilters, onFilterCh
   return (
     <>
         {/* Desktop Sidebar */}
-        <aside className="hidden lg:flex flex-col w-72 border-r bg-background h-screen sticky top-0">
+        <aside className="hidden lg:flex flex-col w-[280px] border-r bg-background h-screen sticky top-0">
            <FilterContent />
         </aside>
 
@@ -108,9 +140,9 @@ export default function FilterSidebar({ filterOptions, activeFilters, onFilterCh
                     <div className="flex-1 overflow-hidden">
                        <FilterContent />
                     </div>
-                     <div className="p-4 border-t">
+                     <div className="p-4 border-t bg-background">
                         <Button onClick={() => setSheetOpen(false)} className="w-full">
-                            Apply Filters
+                            View {activeFilterCount > 0 ? `${activeFilterCount} Filters` : 'Results'}
                         </Button>
                     </div>
                 </SheetContent>

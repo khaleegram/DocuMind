@@ -19,6 +19,20 @@ import Fuse from 'fuse.js';
 
 export type FilterCategory = 'owner' | 'type' | 'company' | 'country';
 
+// Function to find the canonical name for a given value
+const findCanonicalName = (value: string, existingNames: Set<string>): string => {
+    if (existingNames.has(value)) {
+        return value;
+    }
+    const fuse = new Fuse(Array.from(existingNames), { threshold: 0.2 });
+    const results = fuse.search(value);
+    if (results.length > 0) {
+        return results[0].item;
+    }
+    return value;
+};
+
+
 export default function DashboardPage() {
   const [user, loading] = useAuthState(auth);
   const router = useRouter();
@@ -70,10 +84,26 @@ export default function DashboardPage() {
       country: new Set(),
     };
     documents.forEach(doc => {
-      if (doc.owner) options.owner.add(doc.owner);
-      if (doc.type) options.type.add(doc.type);
-      if (doc.company) options.company.add(doc.company);
-      if (doc.country) options.country.add(doc.country);
+      // Normalize and group owners
+      if (doc.owner) {
+          const canonicalOwner = findCanonicalName(doc.owner, options.owner);
+          options.owner.add(canonicalOwner);
+      }
+      // Normalize and group types
+      if (doc.type) {
+          const canonicalType = findCanonicalName(doc.type, options.type);
+          options.type.add(canonicalType);
+      }
+      // Normalize and group companies
+      if (doc.company) {
+          const canonicalCompany = findCanonicalName(doc.company, options.company);
+          options.company.add(canonicalCompany);
+      }
+      // Normalize and group countries
+       if (doc.country) {
+          const canonicalCountry = findCanonicalName(doc.country, options.country);
+          options.country.add(canonicalCountry);
+      }
     });
     return {
         owner: Array.from(options.owner).sort(),
@@ -98,22 +128,29 @@ export default function DashboardPage() {
   const filteredDocuments = useMemo(() => {
     let filtered = documents;
     
-    // Apply sidebar filters
-    Object.entries(activeFilters).forEach(([category, values]) => {
-        if (values.size > 0) {
-            filtered = filtered.filter(doc => {
+    // Apply sidebar filters with fuzzy matching for document values
+    const hasActiveFilters = Object.values(activeFilters).some(s => s.size > 0);
+
+    if (hasActiveFilters) {
+        filtered = filtered.filter(doc => {
+            return Object.entries(activeFilters).every(([category, values]) => {
+                if (values.size === 0) return true;
                 const cat = category as FilterCategory;
                 const docValue = doc[cat];
-                return docValue && values.has(docValue);
-            });
-        }
-    });
+                if (!docValue) return false;
 
-    // Apply fuzzy search
+                // Check if the doc's value fuzzily matches any of the selected canonical filter values
+                const fuse = new Fuse(Array.from(values), { threshold: 0.2 });
+                return fuse.search(docValue).length > 0;
+            });
+        });
+    }
+
+    // Apply fuzzy search on top of filters
     if (submittedSearchQuery) {
         const fuse = new Fuse(filtered, {
-            keys: ['owner', 'company', 'type', 'keywords', 'summary', 'textContent'],
-            threshold: 0.4, // Adjust for more or less fuzziness
+            keys: ['owner', 'company', 'type', 'keywords', 'summary', 'textContent', 'country'],
+            threshold: 0.4, 
             includeScore: true,
         });
         filtered = fuse.search(submittedSearchQuery).map(result => result.item);
@@ -187,6 +224,10 @@ export default function DashboardPage() {
     }
   };
   
+  const clearFilters = useCallback(() => {
+    setActiveFilters({ owner: new Set(), type: new Set(), company: new Set(), country: new Set() });
+  }, []);
+
   if (loading || (!user && !loading)) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -196,12 +237,12 @@ export default function DashboardPage() {
   }
   
   return (
-    <div className="flex h-screen">
+    <div className="lg:grid lg:grid-cols-[280px_1fr] h-screen">
       <FilterSidebar 
         filterOptions={filterOptions}
         activeFilters={activeFilters}
         onFilterChange={handleFilterChange}
-        onClearFilters={() => setActiveFilters({ owner: new Set(), type: new Set(), company: new Set(), country: new Set() })}
+        onClearFilters={clearFilters}
       />
       <div className="flex flex-col flex-1 overflow-hidden">
         <Header 

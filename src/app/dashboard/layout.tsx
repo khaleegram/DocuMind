@@ -9,8 +9,6 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarProvider,
-  SidebarTrigger,
-  useSidebar,
 } from '@/components/ui/sidebar';
 import { Folder, Home, LogOut } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
@@ -28,7 +26,6 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 
 function MainSidebar() {
   const pathname = usePathname();
-  const { isMobile } = useSidebar();
   const router = useRouter();
   const [user] = useAuthState(auth);
 
@@ -39,8 +36,8 @@ function MainSidebar() {
 
   return (
     <Sidebar
-      collapsible={isMobile ? 'offcanvas' : 'icon'}
-      className="group-data-[variant=inset]:bg-card"
+      collapsible="icon"
+      className="group-data-[variant=inset]:bg-card hidden sm:flex"
     >
       <SidebarHeader className="p-4">
          <div className="flex items-center gap-2 font-semibold cursor-pointer" onClick={() => router.push('/dashboard')}>
@@ -61,20 +58,6 @@ function MainSidebar() {
               <a href="/dashboard">
                 <Home />
                 <span>My Documents</span>
-              </a>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-           <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              isActive={pathname.startsWith('/dashboard/folders')}
-              tooltip={{
-                children: 'Folders',
-              }}
-            >
-              <a href="/dashboard/folders">
-                <Folder />
-                <span>Folders</span>
               </a>
             </SidebarMenuButton>
           </SidebarMenuItem>
