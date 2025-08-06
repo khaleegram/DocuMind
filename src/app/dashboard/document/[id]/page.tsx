@@ -2,17 +2,19 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import type { Document as DocumentType } from '@/lib/types';
-import { Loader2, ArrowLeft, Send, User, Bot } from 'lucide-react';
+import { Loader2, ArrowLeft, Send, User, Bot, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import Link from 'next/link';
 import { chatWithDocument } from '@/ai/flows/chat-with-document';
+import { generateSuggestedQuestions } from '@/ai/flows/generate-suggested-questions';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type Message = {
   sender: 'user' | 'ai';
@@ -31,6 +33,9 @@ export default function DocumentChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isAnswering, setIsAnswering] = useState(false);
+  const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
 
@@ -47,7 +52,7 @@ export default function DocumentChatPage() {
     }
 
     const docRef = doc(db, 'documents', id);
-    const unsubscribe = onSnapshot(docRef, (docSnap) => {
+    const unsubscribe = onSnapshot(docRef, async (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
         const docData = {
@@ -67,6 +72,18 @@ export default function DocumentChatPage() {
           setMessages([{ sender: 'ai', text: "Hello! I'm still analyzing this document. I'll be ready to chat once the processing is complete." }]);
         } else if (messages.length === 0) {
            setMessages([{ sender: 'ai', text: `Hello! I'm ready to answer questions about "${docData.owner}". What would you like to know?` }]);
+           if (docData.textContent) {
+              setIsLoadingSuggestions(true);
+              try {
+                const { questions } = await generateSuggestedQuestions({ documentText: docData.textContent });
+                setSuggestedQuestions(questions);
+              } catch (error) {
+                console.error("Error generating suggested questions:", error);
+                setSuggestedQuestions([]);
+              } finally {
+                setIsLoadingSuggestions(false);
+              }
+           }
         }
 
       } else {
@@ -87,19 +104,18 @@ export default function DocumentChatPage() {
     }
   }, [messages]);
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || !document || !document.textContent || document.isProcessing) return;
+  const submitQuery = async (query: string) => {
+    if (!query.trim() || !document || !document.textContent || document.isProcessing) return;
 
-    const userMessage: Message = { sender: 'user', text: input };
+    const userMessage: Message = { sender: 'user', text: query };
     setMessages((prev) => [...prev, userMessage]);
-    setInput('');
+    setSuggestedQuestions([]); // Hide suggestions after user asks a question
     setIsAnswering(true);
 
     try {
         const { answer } = await chatWithDocument({
             documentText: document.textContent,
-            question: input,
+            question: query,
         });
         const aiMessage: Message = { sender: 'ai', text: answer };
         setMessages((prev) => [...prev, aiMessage]);
@@ -110,7 +126,17 @@ export default function DocumentChatPage() {
     } finally {
         setIsAnswering(false);
     }
+  }
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await submitQuery(input);
+    setInput('');
   };
+
+  const handleSuggestionClick = async (question: string) => {
+    await submitQuery(question);
+  }
 
   if (isLoadingDoc || loadingAuth) {
     return (
@@ -176,6 +202,29 @@ export default function DocumentChatPage() {
                       )}
                   </div>
                 </ScrollArea>
+                 {(isLoadingSuggestions || suggestedQuestions.length > 0) && (
+                  <div className="mt-4 border-t pt-4">
+                    <div className="flex items-center gap-2 mb-2">
+                       <Sparkles className="h-4 w-4 text-accent" />
+                       <h4 className="text-sm font-semibold">Suggested Questions</h4>
+                    </div>
+                    {isLoadingSuggestions ? (
+                      <div className="space-y-2">
+                        <Skeleton className="h-9 w-full rounded-md" />
+                        <Skeleton className="h-9 w-2/3 rounded-md" />
+                        <Skeleton className="h-9 w-3/4 rounded-md" />
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {suggestedQuestions.map((q, i) => (
+                          <Button key={i} variant="outline" size="sm" onClick={() => handleSuggestionClick(q)} disabled={isAnswering}>
+                            {q}
+                          </Button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                 )}
                 <div className="mt-4 border-t pt-4">
                   <form onSubmit={handleSendMessage} className="flex items-center gap-2">
                     <Input
