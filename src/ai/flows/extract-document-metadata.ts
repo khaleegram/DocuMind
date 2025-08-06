@@ -46,21 +46,15 @@ const prompt = ai.definePrompt({
   prompt: `You are an AI assistant specialized in extracting and normalizing key information from document images.
   Analyze the following document image and extract the required metadata.
 
-  **IMPORTANT FORMATTING RULES:**
-  - For all text fields (owner, company, documentType, country), you MUST format them in Title Case (e.g., "John Doe", "Innovate Inc.", "Drivers License").
-  - For the 'owner' field, if it is a person's name, reformat it to "Firstname Lastname" order. For example, if the document says "DOE, JOHN", you must return "John Doe". If no person is clearly identified, use the primary company name as the owner.
+  **CRITICAL NORMALIZATION RULES:**
+  - **Owner Field:** Identify the primary person's full name. You MUST reformat it to "Firstname Lastname" order and apply Title Case. For example, if the document says "DOE, JOHN" or "john doe", you must return "John Doe". If no person is clearly identified, use the primary company name as the owner, formatted in Title Case.
+  - **Other Text Fields:** For 'company', 'documentType', and 'country', you MUST format them in Title Case (e.g., "Innovate Inc.", "Drivers License", "United States"). This ensures consistency.
+  - **Dates:** Find the expiration date and format it as YYYY-MM-DD. If no expiry date is present, use null.
+  - **Null Values:** If a field like 'company', 'country', or 'expiryDate' is not present on the document, you MUST return null. Do not guess or invent information.
 
   Image: {{media url=documentDataUrl}}
 
-  - **Owner:** Identify the full name of the primary person. Format it as "Firstname Lastname" in Title Case. If no person, use the primary company name in Title Case.
-  - **Company:** Identify the company or organization. Format it in Title Case. If no company is present, use null.
-  - **Document Type:** Determine the type of document. Format it in Title Case.
-  - **Expiry Date:** Find the expiration date and format it as YYYY-MM-DD. If no expiry date is present, use null.
-  - **Country:** Identify the country of origin for the document. Use the full country name, formatted in Title Case. If not found, use null.
-  - **Keywords:** Generate 3-5 relevant keywords from the document's content.
-  - **Summary:** Provide a brief, one-to-two sentence summary of the document's main content.
-
-  Return the extracted data in the specified JSON format.
+  Return the extracted and normalized data in the specified JSON format.
   `,
 });
 
