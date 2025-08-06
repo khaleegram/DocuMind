@@ -35,13 +35,21 @@ export default function LoginPage() {
     try {
       await signInWithPopup(auth, googleProvider);
       router.push('/dashboard');
-    } catch (error) {
+    } catch (error: any) {
       console.error("Authentication failed:", error);
-      toast({
-        variant: 'destructive',
-        title: 'Login Failed',
-        description: 'Could not sign in with Google. Please try again.',
-      });
+      if (error.code === 'auth/popup-closed-by-user') {
+        toast({
+          variant: 'destructive',
+          title: 'Login Cancelled',
+          description: 'The sign-in popup was closed before authentication could complete.',
+        });
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'Login Failed',
+          description: 'Could not sign in with Google. Please try again.',
+        });
+      }
     } finally {
       setIsLoggingIn(false);
     }
