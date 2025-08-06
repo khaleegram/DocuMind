@@ -25,7 +25,14 @@ import { auth } from '@/lib/firebase';
 import { v4 as uuidv4 } from 'uuid';
 
 const uploadSchema = z.object({
-  file: z.instanceof(FileList).refine(files => files?.length === 1, 'File is required.'),
+  file: z
+    .any()
+    .refine((files) => files?.length === 1, 'File is required.')
+    .refine((files) => files?.[0]?.size <= 5000000, `Max file size is 5MB.`)
+    .refine(
+      (files) => ["image/jpeg", "image/png", "application/pdf"].includes(files?.[0]?.type),
+      "Only .jpg, .png and .pdf files are accepted."
+    ),
 });
 
 type UploadDialogProps = {
