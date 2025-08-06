@@ -7,7 +7,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import type { FilterCategory } from '@/app/dashboard/page';
+import type { FilterCategory } from '@/app/dashboard/documents/page';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Filter, Search, X } from 'lucide-react';
 import Fuse from 'fuse.js';
