@@ -10,7 +10,6 @@ import { auth, db } from '@/lib/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { useRouter } from 'next/navigation';
 import { collection, query, where, onSnapshot, deleteDoc, doc, getDoc } from 'firebase/firestore';
-import { ref, deleteObject } from 'firebase/storage';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
@@ -63,9 +62,8 @@ export default function DashboardPage() {
     );
   }, [documents, searchQuery]);
 
-  const handleDeleteDocument = async (docId: string) => {
+ const handleDeleteDocument = async (docId: string) => {
     if (!user) return;
-
     try {
       const docRef = doc(db, 'documents', docId);
       const docSnap = await getDoc(docRef);
@@ -143,14 +141,14 @@ export default function DashboardPage() {
   }
   
   return (
-    <div className="flex flex-col h-screen overflow-hidden">
+    <div className="flex flex-col h-screen overflow-hidden sm:overflow-auto">
       <Header 
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         onUploadClick={() => setUploadDialogOpen(true)}
         title="My Documents"
       />
-      <main className="flex-1 overflow-y-auto p-4 md:p-6">
+      <main className="flex-1 overflow-y-auto p-4 md:p-0">
         {isLoadingDocs ? (
            <div className="flex items-center justify-center pt-20">
              <Loader2 className="h-16 w-16 animate-spin text-primary" />
@@ -166,3 +164,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    

@@ -5,7 +5,6 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
-  SidebarInset,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
@@ -13,9 +12,8 @@ import {
   SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { Home, Folder, Settings, FileSearch, LogOut } from 'lucide-react';
+import { Home, Folder, FileSearch, LogOut } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -90,7 +88,7 @@ function MainSidebar() {
                         <AvatarImage src={user?.photoURL || ''} alt={user?.displayName || 'User Avatar'} data-ai-hint="profile picture" />
                         <AvatarFallback>{user?.displayName?.charAt(0) || 'U'}</AvatarFallback>
                     </Avatar>
-                    <div className="flex flex-col group-data-[collapsible=icon]:hidden">
+                    <div className="flex flex-col group-data-[collapsible=icon]:hidden truncate">
                         <span className="text-sm font-semibold truncate">{user?.displayName}</span>
                         <span className="text-xs text-muted-foreground truncate">{user?.email}</span>
                     </div>
@@ -123,10 +121,14 @@ export default function DashboardLayout({
     <SidebarProvider>
         <div className="flex min-h-screen w-full flex-col bg-muted/40">
             <MainSidebar />
-            <SidebarInset>
-             {children}
-            </SidebarInset>
+            <div className="flex flex-col sm:gap-4 sm:py-4 sm:pl-14">
+                <main className="flex-1 items-start gap-4 p-0 sm:px-6 sm:py-0 md:gap-8">
+                    {children}
+                </main>
+            </div>
         </div>
     </SidebarProvider>
   );
 }
+
+    

@@ -87,9 +87,8 @@ export default function FolderDetailsPage() {
     );
   }, [documents, searchQuery]);
 
-  const handleDeleteDocument = async (docId: string) => {
-     if (!user) return;
-
+ const handleDeleteDocument = async (docId: string) => {
+    if (!user) return;
     try {
       const docRef = doc(db, 'documents', docId);
       const docSnap = await getDoc(docRef);
@@ -192,3 +191,5 @@ export default function FolderDetailsPage() {
     </div>
   );
 }
+
+    
