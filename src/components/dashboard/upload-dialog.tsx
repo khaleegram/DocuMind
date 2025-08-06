@@ -24,7 +24,7 @@ import { extractTextFromImage } from '@/ai/flows/extract-text-from-image';
 import { auth, db } from '@/lib/firebase';
 import { v4 as uuidv4 } from 'uuid';
 import { doc, addDoc, collection, serverTimestamp, updateDoc } from 'firebase/firestore';
-import { GoogleAuthProvider } from 'firebase/auth';
+import { GoogleAuthProvider, reauthenticateWithPopup, getAdditionalUserInfo } from 'firebase/auth';
 
 
 const uploadSchema = z.object({
@@ -65,8 +65,11 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
     const uniqueFileName = `${uuidv4()}-${file.name}`;
   
     try {
-      const credential = GoogleAuthProvider.credentialFromError(user.providerData[0] as any) ?? 
-                         GoogleAuthProvider.credential(await user.getIdToken());
+      // Reauthenticate to get a fresh credential
+      const provider = new GoogleAuthProvider();
+      provider.addScope('https://www.googleapis.com/auth/drive.file');
+      const result = await reauthenticateWithPopup(user, provider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
       
       if (!credential || !credential.accessToken) {
         throw new Error("Could not retrieve a valid access token. Please sign in again.");
@@ -186,12 +189,19 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
           description: `${file.name} was saved. PDF analysis is not yet supported.`,
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to upload document:', error);
+      let description = 'Could not upload the document. Please try again.';
+      if (error.code === 'auth/popup-closed-by-user') {
+        description = 'The authentication popup was closed. Please try uploading again.';
+      } else if (error.message) {
+        description = error.message;
+      }
+      
       toast({
         variant: 'destructive',
         title: 'Upload Failed',
-        description: 'Could not upload the document. Please try again.',
+        description: description,
       });
     } finally {
       setIsProcessing(false);
