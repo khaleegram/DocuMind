@@ -136,48 +136,20 @@ export default function AllDocumentsPage() {
     setSubmittedSearchQuery('');
   }, []);
   
-  const handleAiSearch = useCallback((criteria: IntelligentSearchOutput) => {
-    const { owner, documentType, country, keywords } = criteria;
+  const handleAiSearch = useCallback((searchString: string) => {
+    const fuse = new Fuse(documents, {
+        keys: ['owner', 'company', 'type', 'keywords', 'summary', 'textContent', 'country', 'fileName'],
+        threshold: 0.4, 
+        includeScore: true,
+    });
     
-    let potentialMatches = documents;
-
-    // Step 1: Filter by specific, high-confidence fields first (if available)
-    if (owner || documentType || country) {
-        const fuseFilter = new Fuse(potentialMatches, { threshold: 0.3, keys: ['owner', 'type', 'country'] });
-        
-        let filteredByEntities: DocumentType[] = potentialMatches;
-        
-        if (owner) {
-             filteredByEntities = fuseFilter.search(owner).map(r => r.item).filter(d => d.owner && new Fuse([d.owner]).search(owner).length > 0);
-        }
-        if (documentType) {
-            filteredByEntities = filteredByEntities.filter(d => d.type && new Fuse([d.type]).search(documentType).length > 0);
-        }
-        if (country) {
-            filteredByEntities = filteredByEntities.filter(d => d.country && new Fuse([d.country]).search(country).length > 0);
-        }
-        potentialMatches = filteredByEntities;
-    }
-    
-    // Step 2: Use remaining keywords to perform a broader fuzzy search on the narrowed-down list
-    let finalResults = potentialMatches;
-    if (keywords && keywords.length > 0) {
-        const keywordQuery = keywords.join(' ');
-        const fuseSearch = new Fuse(potentialMatches, {
-            keys: ['summary', 'textContent', 'keywords', 'company', 'owner', 'type'],
-            threshold: 0.4,
-            includeScore: true,
-        });
-        finalResults = fuseSearch.search(keywordQuery).map(result => result.item);
-    }
-    
-    setAiSearchResults(finalResults);
+    const results = fuse.search(searchString);
+    setAiSearchResults(results.map(result => result.item));
 
     // Clear manual filters and search to avoid confusion
     setActiveFilters({ owner: new Set(), type: new Set(), company: new Set(), country: new Set() });
     setSearchQuery('');
     setSubmittedSearchQuery('');
-
   }, [documents]);
 
 

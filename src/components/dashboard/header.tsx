@@ -26,13 +26,13 @@ type HeaderProps = {
   setSearchQuery?: (query: string) => void;
   onSearchSubmit?: () => void;
   onUploadClick: () => void;
-  onAiSearch?: (criteria: IntelligentSearchOutput) => void;
+  onAiSearch?: (query: string) => void;
   title: string;
   showSearch?: boolean;
   showAiSearch?: boolean;
 };
 
-function AiSearchAgent({ onAiSearch }: { onAiSearch: (criteria: IntelligentSearchOutput) => void }) {
+function AiSearchAgent({ onAiSearch }: { onAiSearch: (query: string) => void }) {
     const [query, setQuery] = useState('');
     const [isSearching, setIsSearching] = useState(false);
     const { toast } = useToast();
@@ -43,8 +43,9 @@ function AiSearchAgent({ onAiSearch }: { onAiSearch: (criteria: IntelligentSearc
 
         setIsSearching(true);
         try {
-            const result = await intelligentSearch({ query });
-            onAiSearch(result);
+            // We can still run this to log the structured query, or for future analytics
+            await intelligentSearch({ query }); 
+            onAiSearch(query);
         } catch (error) {
             console.error("AI search failed:", error);
             toast({
