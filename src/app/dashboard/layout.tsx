@@ -12,7 +12,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { Home, LogOut } from 'lucide-react';
+import { Folder, Home, LogOut } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -64,6 +64,20 @@ function MainSidebar() {
               </a>
             </SidebarMenuButton>
           </SidebarMenuItem>
+           <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              isActive={pathname.startsWith('/dashboard/folders')}
+              tooltip={{
+                children: 'Folders',
+              }}
+            >
+              <a href="/dashboard/folders">
+                <Folder />
+                <span>Folders</span>
+              </a>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
         </SidebarMenu>
       </SidebarContent>
       <SidebarFooter>
@@ -108,9 +122,9 @@ export default function DashboardLayout({
         <div className="flex min-h-screen w-full flex-col bg-muted/40">
             <MainSidebar />
             <div className="flex flex-col sm:pl-14">
-                <main className="flex-1 items-start">
+                 <div className="flex-1">
                     {children}
-                </main>
+                </div>
             </div>
         </div>
     </SidebarProvider>

@@ -22,11 +22,13 @@ export default function Header({ searchQuery, setSearchQuery, onSearchSubmit, on
   }
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:px-6">
-      <SidebarTrigger className="sm:hidden" />
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/95 px-4 backdrop-blur-sm sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 sm:py-4">
+       <div className="lg:hidden">
+          <SidebarTrigger />
+       </div>
       
       <div className="flex w-full items-center gap-4">
-        <h1 className="flex-1 text-2xl font-semibold hidden sm:block">{title}</h1>
+        <h1 className="flex-1 shrink-0 text-2xl font-semibold hidden md:block whitespace-nowrap">{title}</h1>
         <div className="relative flex-1 ml-auto sm:flex-grow-0">
           <Input
             type="search"

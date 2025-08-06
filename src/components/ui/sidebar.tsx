@@ -217,7 +217,7 @@ const Sidebar = React.forwardRef<
     return (
       <div
         ref={ref}
-        className={cn("peer hidden shrink-0 sm:block text-sidebar-foreground",
+        className={cn("hidden lg:flex flex-col shrink-0 text-sidebar-foreground",
          "transition-all duration-300 ease-in-out",
          state === 'expanded' ? 'sm:w-56' : 'sm:w-14'
         )}
@@ -442,7 +442,7 @@ const SidebarMenu = React.forwardRef<
   <ul
     ref={ref}
     data-sidebar="menu"
-    className={cn("flex w-full min-w-0 flex-col gap-1", className)}
+    className={cn("flex w-full min-w-0 flex-col gap-1 p-2", className)}
     {...props}
   />
 ))
@@ -710,5 +710,3 @@ export {
   SidebarSeparator,
   useSidebar,
 }
-
-    
