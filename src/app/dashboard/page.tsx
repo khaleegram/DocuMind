@@ -5,12 +5,14 @@ import type { Document as DocumentType } from '@/lib/types';
 import Header from '@/components/dashboard/header';
 import DocumentList from '@/components/dashboard/document-list';
 import { UploadDialog } from '@/components/dashboard/upload-dialog';
-import { auth, db, storage } from '@/lib/firebase';
+import { auth, db, storage, googleProvider } from '@/lib/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { useRouter } from 'next/navigation';
 import { collection, query, where, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
 import { ref, deleteObject } from 'firebase/storage';
 import { Loader2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 
 export default function DashboardPage() {
   const [user, loading] = useAuthState(auth);
@@ -19,6 +21,7 @@ export default function DashboardPage() {
   const [isLoadingDocs, setIsLoadingDocs] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [isUploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (loading) return;
@@ -60,16 +63,48 @@ export default function DashboardPage() {
 
   const handleDeleteDocument = async (docToDelete: DocumentType) => {
     if (!user) return;
+    
     try {
+      // Re-authenticate to get a fresh access token for the Drive API call
+      const result = await signInWithPopup(auth, googleProvider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      if (!credential || !credential.accessToken) {
+        throw new Error("Could not get valid credentials to delete file.");
+      }
+      const accessToken = credential.accessToken;
+
+      // Delete from Google Drive
+      const driveResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${docToDelete.driveFileId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': 'Bearer ' + accessToken
+        }
+      });
+
+      if (!driveResponse.ok) {
+        const errorData = await driveResponse.json();
+        console.error('Google Drive deletion error:', errorData);
+        // Don't throw if file not found (it might have been deleted manually)
+        if (driveResponse.status !== 404) {
+          throw new Error(errorData.error.message || 'Failed to delete file from Google Drive.');
+        }
+      }
+
       // Delete firestore document
       await deleteDoc(doc(db, 'documents', docToDelete.id));
 
-      // This is a placeholder for file deletion from a real storage provider
-      // For Google Drive, a different API call would be needed
-      console.log(`Deletion requested for file: ${docToDelete.fileName}`);
+      toast({
+        title: 'Document Deleted',
+        description: `${docToDelete.fileName} has been removed.`,
+      });
       
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error deleting document: ", error);
+        toast({
+            variant: 'destructive',
+            title: 'Deletion Failed',
+            description: error.message || 'Could not delete the document.',
+        });
     }
   };
   

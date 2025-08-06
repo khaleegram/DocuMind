@@ -14,4 +14,5 @@ export type Document = {
   textContent: string;
   mimeType: string;
   thumbnailUrl: string | null;
+  driveFileId: string;
 };

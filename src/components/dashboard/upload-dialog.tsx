@@ -144,6 +144,7 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
         thumbnailUrl: thumbnailUrl,
         mimeType: file.type,
         uploadedAt: serverTimestamp(),
+        driveFileId: driveFile.id,
         owner: 'Processing...',
         type: 'Processing...',
         keywords: [],
