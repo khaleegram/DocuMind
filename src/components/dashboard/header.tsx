@@ -5,7 +5,6 @@ import { Search, Upload, Sparkles, Loader2, LogOut } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
-import { intelligentSearch, type IntelligentSearchOutput } from '@/ai/flows/intelligent-search';
 import { useToast } from '@/hooks/use-toast';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth } from '@/lib/firebase';
@@ -27,35 +26,19 @@ type HeaderProps = {
   onSearchSubmit?: () => void;
   onUploadClick: () => void;
   onAiSearch?: (query: string) => void;
+  isAiSearching?: boolean;
   title: string;
   showSearch?: boolean;
   showAiSearch?: boolean;
 };
 
-function AiSearchAgent({ onAiSearch }: { onAiSearch: (query: string) => void }) {
+function AiSearchAgent({ onAiSearch, isSearching }: { onAiSearch: (query: string) => void, isSearching: boolean }) {
     const [query, setQuery] = useState('');
-    const [isSearching, setIsSearching] = useState(false);
-    const { toast } = useToast();
-
+    
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!query.trim()) return;
-
-        setIsSearching(true);
-        try {
-            // We can still run this to log the structured query, or for future analytics
-            await intelligentSearch({ query }); 
-            onAiSearch(query);
-        } catch (error) {
-            console.error("AI search failed:", error);
-            toast({
-                variant: 'destructive',
-                title: 'AI Search Failed',
-                description: 'Could not perform the intelligent search. Please try a different query.'
-            })
-        } finally {
-            setIsSearching(false);
-        }
+        if (!query.trim() || isSearching) return;
+        onAiSearch(query);
     }
     
     return (
@@ -133,6 +116,7 @@ export default function Header({
     onSearchSubmit, 
     onUploadClick, 
     onAiSearch,
+    isAiSearching = false,
     title,
     showSearch = true,
     showAiSearch = false
@@ -153,7 +137,7 @@ export default function Header({
       <div className="flex w-full items-center gap-4">
         <h1 className="flex-1 shrink-0 text-xl font-semibold md:text-2xl whitespace-nowrap">{title}</h1>
         <div className="ml-auto flex items-center gap-2">
-            {showAiSearch && onAiSearch && <AiSearchAgent onAiSearch={onAiSearch} />}
+            {showAiSearch && onAiSearch && <AiSearchAgent onAiSearch={onAiSearch} isSearching={isAiSearching} />}
             {showSearch && onSearchSubmit && setSearchQuery && (
                  <form onSubmit={handleFormSubmit} className="relative flex-1 ml-auto sm:flex-grow-0">
                     <Input

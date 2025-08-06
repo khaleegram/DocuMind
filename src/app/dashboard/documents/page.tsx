@@ -16,7 +16,6 @@ import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { googleProvider } from '@/lib/firebase';
 import FilterSidebar from '@/components/dashboard/filter-sidebar';
 import Fuse from 'fuse.js';
-import type { IntelligentSearchOutput } from '@/ai/flows/intelligent-search';
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { intelligentSearch } from '@/ai/flows/intelligent-search';
 
@@ -45,6 +44,7 @@ export default function AllDocumentsPage() {
   const [submittedSearchQuery, setSubmittedSearchQuery] = useState('');
   const [isUploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [aiSearchResults, setAiSearchResults] = useState<DocumentType[] | null>(null);
+  const [isAiSearching, setIsAiSearching] = useState(false);
   const [activeFilters, setActiveFilters] = useState<Record<FilterCategory, Set<string>>>({
     owner: new Set(),
     type: new Set(),
@@ -137,21 +137,45 @@ export default function AllDocumentsPage() {
     setSubmittedSearchQuery('');
   }, []);
   
-  const handleAiSearch = useCallback((searchString: string) => {
-    const fuse = new Fuse(documents, {
-        keys: ['owner', 'company', 'type', 'keywords', 'summary', 'textContent', 'country', 'fileName'],
-        threshold: 0.4,
-        includeScore: true,
-    });
-    
-    const results = fuse.search(searchString);
-    setAiSearchResults(results.map(result => result.item));
-
+ const handleAiSearch = useCallback(async (searchString: string) => {
+    setIsAiSearching(true);
     // Clear manual filters and search to avoid confusion
     setActiveFilters({ owner: new Set(), type: new Set(), company: new Set(), country: new Set() });
     setSearchQuery('');
     setSubmittedSearchQuery('');
-  }, [documents]);
+
+    try {
+      const documentsToSearch = documents.map(doc => ({
+        id: doc.id,
+        owner: doc.owner,
+        type: doc.type,
+        company: doc.company,
+        country: doc.country,
+        summary: doc.summary || '',
+        keywords: doc.keywords,
+      }));
+
+      const { documentIds } = await intelligentSearch({
+        query: searchString,
+        documents: documentsToSearch,
+      });
+
+      const resultsMap = new Map(documents.map(doc => [doc.id, doc]));
+      const matchedDocs = documentIds.map(id => resultsMap.get(id)).filter(Boolean) as DocumentType[];
+      setAiSearchResults(matchedDocs);
+
+    } catch (error) {
+        console.error("AI search failed:", error);
+        toast({
+            variant: 'destructive',
+            title: 'AI Search Failed',
+            description: 'Could not perform the intelligent search. Please try again later.'
+        });
+        setAiSearchResults([]); // Show empty state on error
+    } finally {
+        setIsAiSearching(false);
+    }
+  }, [documents, toast]);
 
 
  const handleDeleteDocument = async (docId: string) => {
@@ -268,6 +292,10 @@ export default function AllDocumentsPage() {
     );
   }
   
+  const showLoader = isLoadingDocs || isAiSearching;
+  const showEmptyState = (displayedDocuments.length === 0 && (submittedSearchQuery.length > 0 || aiSearchResults !== null)) || (documents.length === 0 && !isLoadingDocs);
+
+
   return (
     <div className="lg:grid lg:grid-cols-[280px_1fr] h-screen">
       <FilterSidebar 
@@ -284,16 +312,17 @@ export default function AllDocumentsPage() {
           onSearchSubmit={handleSearchSubmit}
           onUploadClick={() => setUploadDialogOpen(true)}
           onAiSearch={handleAiSearch}
+          isAiSearching={isAiSearching}
           title="All Documents"
           showAiSearch={true}
         />
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
-          {isLoadingDocs ? (
+          {showLoader ? (
             <div className="flex items-center justify-center pt-20">
               <Loader2 className="h-16 w-16 animate-spin text-primary" />
             </div>
           ) : (
-             displayedDocuments.length === 0 && (submittedSearchQuery || aiSearchResults !== null) 
+             showEmptyState
              ? <EmptyState /> 
              : <DocumentList documents={displayedDocuments} onDelete={handleDeleteDocument} />
           )}
