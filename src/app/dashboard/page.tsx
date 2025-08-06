@@ -62,30 +62,40 @@ export default function DashboardPage() {
     );
   }, [documents, searchQuery]);
 
-  const handleDeleteDocument = async (docToDelete: DocumentType) => {
+  const handleDeleteDocument = async (docId: string) => {
     if (!user) return;
 
-    // If there's no driveFileId, it might be an older record.
-    // Just delete it from Firestore.
-    if (!docToDelete.driveFileId) {
-      try {
-        await deleteDoc(doc(db, 'documents', docToDelete.id));
-        toast({
-          title: 'Document Record Deleted',
-          description: `Removed ${docToDelete.fileName} from your list. The file was not on Google Drive.`,
-        });
-      } catch (error: any) {
-        console.error("Error deleting firestore document: ", error);
-        toast({
-            variant: 'destructive',
-            title: 'Deletion Failed',
-            description: 'Could not delete the document record from Firestore.',
-        });
-      }
-      return;
-    }
-    
+    let docToDelete: DocumentType | null = null;
     try {
+      // Fetch the latest document data from Firestore
+      const docRef = doc(db, 'documents', docId);
+      const docSnap = await getDoc(docRef);
+
+      if (!docSnap.exists()) {
+        throw new Error("Document not found in the database.");
+      }
+      docToDelete = { id: docSnap.id, ...docSnap.data() } as DocumentType;
+
+      // If there's no driveFileId, it might be an older record.
+      // Just delete it from Firestore.
+      if (!docToDelete.driveFileId) {
+        try {
+          await deleteDoc(doc(db, 'documents', docToDelete.id));
+          toast({
+            title: 'Document Record Deleted',
+            description: `Removed ${docToDelete.fileName} from your list. The file was not on Google Drive.`,
+          });
+        } catch (error: any) {
+          console.error("Error deleting firestore document: ", error);
+          toast({
+              variant: 'destructive',
+              title: 'Deletion Failed',
+              description: 'Could not delete the document record from Firestore.',
+          });
+        }
+        return;
+      }
+      
       // Re-authenticate to get a fresh access token for the Drive API call
       const result = await signInWithPopup(auth, googleProvider);
       const credential = GoogleAuthProvider.credentialFromResult(result);

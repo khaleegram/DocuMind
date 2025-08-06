@@ -4,7 +4,7 @@ import { EmptyState } from '@/components/dashboard/empty-state';
 
 type DocumentListProps = {
   documents: Document[];
-  onDelete: (doc: Document) => void;
+  onDelete: (docId: string) => void;
 };
 
 export default function DocumentList({ documents, onDelete }: DocumentListProps) {

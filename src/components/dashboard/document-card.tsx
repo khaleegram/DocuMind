@@ -12,7 +12,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-export function DocumentCard({ document, onDelete }: { document: Document, onDelete: (doc: Document) => void }) {
+export function DocumentCard({ document, onDelete }: { document: Document, onDelete: (docId: string) => void }) {
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
   const router = useRouter();
 
@@ -141,7 +141,7 @@ export function DocumentCard({ document, onDelete }: { document: Document, onDel
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onDelete(document)} className="text-destructive">
+            <DropdownMenuItem onClick={() => onDelete(document.id)} className="text-destructive">
               <Trash2 className="mr-2 h-4 w-4" />
               Delete
             </DropdownMenuItem>
