@@ -35,15 +35,9 @@ export default function LoginPage() {
     setIsLoggingIn(true);
     try {
       const result = await signInWithPopup(auth, googleProvider);
-      // This gives you a Google Access Token. You can use it to access the Google API.
       const credential = GoogleAuthProvider.credentialFromResult(result);
-      const token = credential?.accessToken;
-      // You can store the token in your state or a secure place to make API calls
-      // For this example, we'll just log it.
-      if (token) {
-        // In a real app, you would likely store this token securely
-        // and use it to make authenticated requests to the Google Drive API.
-        console.log("Google Access Token:", token);
+      if (credential?.accessToken) {
+        sessionStorage.setItem('google-access-token', credential.accessToken);
       }
       router.push('/dashboard');
     } catch (error: any) {

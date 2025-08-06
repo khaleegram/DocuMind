@@ -22,7 +22,6 @@ import { extractDocumentMetadata } from '@/ai/flows/extract-document-metadata';
 import { auth, db } from '@/lib/firebase';
 import { v4 as uuidv4 } from 'uuid';
 import { doc, addDoc, collection, serverTimestamp, updateDoc } from 'firebase/firestore';
-import { GoogleAuthProvider } from 'firebase/auth';
 
 
 const uploadSchema = z.object({
@@ -63,18 +62,17 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
     const uniqueFileName = `${uuidv4()}-${file.name}`;
   
     try {
-      const userCredential = await auth.currentUser?.getIdTokenResult();
-      const googleCredential = GoogleAuthProvider.credential(userCredential?.token);
-      
-      if (!googleCredential) {
-        throw new Error("Could not get Google credential");
+      const accessToken = sessionStorage.getItem('google-access-token');
+
+      if (!accessToken) {
+        throw new Error("No access token found. Please sign in again.");
       }
 
       // 1. Upload file to Google Drive
       const driveResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
         method: 'POST',
         headers: new Headers({ 
-          'Authorization': 'Bearer ' + userCredential.token,
+          'Authorization': 'Bearer ' + accessToken,
           'Content-Type': 'application/json',
         }),
         body: JSON.stringify({
@@ -91,14 +89,14 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
       await fetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFile.id}?uploadType=media`, {
         method: 'PATCH',
         headers: new Headers({
-            'Authorization': 'Bearer ' + userCredential.token,
+            'Authorization': 'Bearer ' + accessToken,
             'Content-Type': file.type,
         }),
         body: file
       })
 
       const fileMetadata = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFile.id}?fields=webViewLink,iconLink`, {
-          headers: new Headers({ 'Authorization': 'Bearer ' + userCredential.token })
+          headers: new Headers({ 'Authorization': 'Bearer ' + accessToken })
       }).then(res => res.json());
 
       const downloadURL = fileMetadata.webViewLink;
