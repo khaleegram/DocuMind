@@ -15,4 +15,13 @@ export type Document = {
   mimeType: string;
   thumbnailUrl: string | null;
   driveFileId: string;
+  folderId?: string; // Link to the folder
 };
+
+export type Folder = {
+    id: string;
+    userId: string;
+    name: string; // The person or organization name
+    driveFolderId: string;
+    createdAt: string;
+}

@@ -24,7 +24,7 @@ import { enhanceSearchWithKeywords } from '@/ai/flows/enhance-search-with-keywor
 import { extractTextFromImage } from '@/ai/flows/extract-text-from-image';
 import { auth, db, googleProvider } from '@/lib/firebase';
 import { v4 as uuidv4 } from 'uuid';
-import { doc, addDoc, collection, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { doc, addDoc, collection, serverTimestamp, updateDoc, query, where, getDocs, setDoc } from 'firebase/firestore';
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 
 
@@ -63,6 +63,82 @@ const retryWithBackoff = async <T,>(
   }
 };
 
+const getOrCreateFolder = async (accessToken: string, folderName: string, parentFolderId: string) => {
+    const foldersRef = collection(db, 'folders');
+    const user = auth.currentUser;
+
+    const q = query(foldersRef, where('userId', '==', user!.uid), where('name', '==', folderName));
+    const querySnapshot = await getDocs(q);
+
+    if (!querySnapshot.empty) {
+        const folderDoc = querySnapshot.docs[0];
+        return { id: folderDoc.id, driveFolderId: folderDoc.data().driveFolderId };
+    }
+
+    // If folder doesn't exist in Firestore, create it in Google Drive
+    const driveMetadataResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
+        method: 'POST',
+        headers: new Headers({ 
+          'Authorization': 'Bearer ' + accessToken,
+          'Content-Type': 'application/json',
+        }),
+        body: JSON.stringify({
+          name: folderName,
+          mimeType: 'application/vnd.google-apps.folder',
+          parents: [parentFolderId]
+        })
+      });
+    
+    if (!driveMetadataResponse.ok) {
+        const errorBody = await driveMetadataResponse.json().catch(() => ({ error: { message: `Could not create folder "${folderName}" in Google Drive.` }}));
+        throw new Error(errorBody.error.message);
+    }
+    const driveFolder = await driveMetadataResponse.json();
+
+    // Create a new folder document in Firestore
+    const newFolderRef = doc(foldersRef);
+    await setDoc(newFolderRef, {
+        userId: user!.uid,
+        name: folderName,
+        driveFolderId: driveFolder.id,
+        createdAt: serverTimestamp(),
+    });
+
+    return { id: newFolderRef.id, driveFolderId: driveFolder.id };
+}
+
+const getDocuMindFolderId = async (accessToken: string) => {
+    // Check if DocuMind folder exists
+    const driveQuery = "mimeType='application/vnd.google-apps.folder' and name='DocuMind' and trashed=false";
+    const driveSearchResponse = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(driveQuery)}&fields=files(id,name)`, {
+        headers: new Headers({ 'Authorization': 'Bearer ' + accessToken })
+    });
+
+    if (!driveSearchResponse.ok) throw new Error("Could not search for DocuMind folder.");
+    const searchResult = await driveSearchResponse.json();
+
+    if (searchResult.files.length > 0) {
+        return searchResult.files[0].id;
+    }
+
+    // Create DocuMind folder if it doesn't exist
+    const driveMetadataResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
+        method: 'POST',
+        headers: new Headers({ 
+          'Authorization': 'Bearer ' + accessToken,
+          'Content-Type': 'application/json',
+        }),
+        body: JSON.stringify({
+          name: 'DocuMind',
+          mimeType: 'application/vnd.google-apps.folder',
+        })
+      });
+    
+    if (!driveMetadataResponse.ok) throw new Error("Could not create the main 'DocuMind' folder in Google Drive.");
+    const driveFolder = await driveMetadataResponse.json();
+    return driveFolder.id;
+}
+
 
 export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -98,7 +174,23 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
       }
       const accessToken = credential.accessToken;
       
-      // 1. Upload file to Google Drive
+      // Get or create the main "DocuMind" folder
+      const docuMindFolderId = await getDocuMindFolderId(accessToken);
+
+      // Temporary placeholder metadata to decide folder name
+      const readerForMetadata = new FileReader();
+      readerForMetadata.readAsDataURL(file);
+      const dataUrlForMetadata = await new Promise<string>((resolve, reject) => {
+        readerForMetadata.onload = e => resolve(e.target?.result as string);
+        readerForMetadata.onerror = e => reject(e);
+      });
+      const tempMetadata = await retryWithBackoff(() => extractDocumentMetadata({ documentDataUrl: dataUrlForMetadata }));
+      const folderName = tempMetadata.company || tempMetadata.owner;
+      
+      // Get or create the specific person/org folder
+      const targetFolder = await getOrCreateFolder(accessToken, folderName, docuMindFolderId);
+
+      // 1. Upload file to Google Drive in the correct folder
       const driveMetadataResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
         method: 'POST',
         headers: new Headers({ 
@@ -108,7 +200,7 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
         body: JSON.stringify({
           name: uniqueFileName,
           mimeType: file.type,
-          // You can add 'parents': ['FOLDER_ID'] here to upload to a specific folder
+          parents: [targetFolder.driveFolderId]
         })
       });
 
@@ -152,12 +244,14 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
         mimeType: file.type,
         uploadedAt: serverTimestamp(),
         driveFileId: driveFile.id,
+        folderId: targetFolder.id,
         owner: 'Processing...',
         type: 'Processing...',
         keywords: [],
         summary: 'Processing...',
         textContent: '',
         expiry: null,
+        company: null,
         isProcessing: true,
       });
 
@@ -169,29 +263,22 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
       // Handle AI processing in the background
       toast({
         title: 'Upload successful!',
-        description: 'Your document is now being processed by the AI.',
-      });
-
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        reader.onload = e => resolve(e.target?.result as string);
-        reader.onerror = e => reject(e);
+        description: 'Your document is now being organized by the AI.',
       });
       
       try {
-        const [metadata, textExtraction] = await Promise.all([
-          retryWithBackoff(() => extractDocumentMetadata({ documentDataUrl: dataUrl })),
-          retryWithBackoff(() => extractTextFromImage({ documentDataUrl: dataUrl })),
+        const [textExtraction] = await Promise.all([
+          // metadata already fetched as tempMetadata
+          retryWithBackoff(() => extractTextFromImage({ documentDataUrl: dataUrlForMetadata })),
         ]);
 
         const { keywords } = await retryWithBackoff(() => enhanceSearchWithKeywords({ documentText: textExtraction.text }));
 
-        await updateDoc(doc(db, 'documents', docRef.id), { ...metadata, keywords, summary: metadata.summary, textContent: textExtraction.text, isProcessing: false });
+        await updateDoc(doc(db, 'documents', docRef.id), { ...tempMetadata, keywords, summary: tempMetadata.summary, textContent: textExtraction.text, isProcessing: false });
 
         toast({
           title: 'Processing Complete!',
-          description: `Successfully analyzed and saved your ${metadata.documentType}.`,
+          description: `Successfully analyzed and saved your ${tempMetadata.documentType}.`,
         });
       } catch (aiError) {
         console.error('Failed to process document with AI:', aiError);
@@ -242,7 +329,7 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
         <DialogHeader>
           <DialogTitle>Upload Document</DialogTitle>
           <DialogDescription>
-            Select a document file to upload. The system will automatically extract its content.
+            Select a document file to upload. The system will automatically organize it for you.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
