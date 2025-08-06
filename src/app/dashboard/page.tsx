@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -63,6 +64,26 @@ export default function DashboardPage() {
 
   const handleDeleteDocument = async (docToDelete: DocumentType) => {
     if (!user) return;
+
+    // If there's no driveFileId, it might be an older record.
+    // Just delete it from Firestore.
+    if (!docToDelete.driveFileId) {
+      try {
+        await deleteDoc(doc(db, 'documents', docToDelete.id));
+        toast({
+          title: 'Document Record Deleted',
+          description: `Removed ${docToDelete.fileName} from your list. The file was not on Google Drive.`,
+        });
+      } catch (error: any) {
+        console.error("Error deleting firestore document: ", error);
+        toast({
+            variant: 'destructive',
+            title: 'Deletion Failed',
+            description: 'Could not delete the document record from Firestore.',
+        });
+      }
+      return;
+    }
     
     try {
       // Re-authenticate to get a fresh access token for the Drive API call
@@ -82,10 +103,10 @@ export default function DashboardPage() {
       });
 
       if (!driveResponse.ok) {
-        const errorData = await driveResponse.json();
-        console.error('Google Drive deletion error:', errorData);
         // Don't throw if file not found (it might have been deleted manually)
         if (driveResponse.status !== 404) {
+          const errorData = await driveResponse.json().catch(() => ({error: {message: "Could not parse error from Google Drive."}}));
+          console.error('Google Drive deletion error:', errorData);
           throw new Error(errorData.error.message || 'Failed to delete file from Google Drive.');
         }
       }
