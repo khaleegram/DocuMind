@@ -8,7 +8,7 @@ import { UploadDialog } from '@/components/dashboard/upload-dialog';
 import { auth, db, storage } from '@/lib/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { useRouter } from 'next/navigation';
-import { collection, query, where, onSnapshot, addDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
 import { ref, deleteObject } from 'firebase/storage';
 import { Loader2 } from 'lucide-react';
 
@@ -51,21 +51,12 @@ export default function DashboardPage() {
     if (!searchQuery) return documents;
     const lowercasedQuery = searchQuery.toLowerCase();
     return documents.filter(doc => 
-        doc.owner.toLowerCase().includes(lowercasedQuery) ||
+        (doc.owner && doc.owner.toLowerCase().includes(lowercasedQuery)) ||
         (doc.company && doc.company.toLowerCase().includes(lowercasedQuery)) ||
-        doc.type.toLowerCase().includes(lowercasedQuery) ||
-        doc.keywords.some(k => k.toLowerCase().includes(lowercasedQuery))
+        (doc.type && doc.type.toLowerCase().includes(lowercasedQuery)) ||
+        (doc.keywords && doc.keywords.some(k => k.toLowerCase().includes(lowercasedQuery)))
     );
   }, [documents, searchQuery]);
-
-  const handleAddDocument = async (newDocData: Omit<DocumentType, 'id' | 'userId' | 'uploadedAt'>) => {
-    if (!user) return;
-    await addDoc(collection(db, 'documents'), {
-      ...newDocData,
-      userId: user.uid,
-      uploadedAt: serverTimestamp(),
-    });
-  };
 
   const handleDeleteDocument = async (docToDelete: DocumentType) => {
     if (!user) return;
@@ -81,7 +72,7 @@ export default function DashboardPage() {
     }
   };
   
-  if (loading || isLoadingDocs) {
+  if (loading || (!user && !loading)) {
     return (
       <div className="flex h-screen items-center justify-center">
         <Loader2 className="h-16 w-16 animate-spin text-primary" />
@@ -99,12 +90,17 @@ export default function DashboardPage() {
       />
       <main className="flex-1 overflow-y-auto p-4 md:p-8">
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight mb-6">My Documents</h1>
-        <DocumentList documents={filteredDocuments} onDelete={handleDeleteDocument} />
+        {isLoadingDocs ? (
+           <div className="flex h-screen items-center justify-center">
+             <Loader2 className="h-16 w-16 animate-spin text-primary" />
+           </div>
+        ) : (
+          <DocumentList documents={filteredDocuments} onDelete={handleDeleteDocument} />
+        )}
       </main>
       <UploadDialog 
         isOpen={isUploadDialogOpen}
         setIsOpen={setUploadDialogOpen}
-        onDocumentAdd={handleAddDocument}
       />
     </div>
   );

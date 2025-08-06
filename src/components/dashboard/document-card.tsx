@@ -3,10 +3,12 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { FileText, Calendar, Building, MoreVertical, Link as LinkIcon, Trash2 } from 'lucide-react';
+import { FileText, Calendar, Building, MoreVertical, Link as LinkIcon, Trash2, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { format, parseISO } from 'date-fns';
+import { Skeleton } from '@/components/ui/skeleton';
+
 
 export function DocumentCard({ document, onDelete }: { document: Document, onDelete: (doc: Document) => void }) {
   const getAiHint = (type: string) => {
@@ -22,6 +24,31 @@ export function DocumentCard({ document, onDelete }: { document: Document, onDel
       default:
         return 'document paper';
     }
+  }
+
+  if (document.isProcessing) {
+    return (
+      <Card className="flex flex-col overflow-hidden rounded-lg shadow-md">
+        <CardHeader className="p-0">
+          <div className="aspect-w-4 aspect-h-3 bg-muted flex items-center justify-center">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          </div>
+        </CardHeader>
+        <CardContent className="flex-1 p-4 space-y-3">
+          <Skeleton className="h-5 w-3/4 rounded" />
+          <Skeleton className="h-4 w-1/2 rounded" />
+          <Skeleton className="h-4 w-1/3 rounded" />
+          <div className="flex flex-wrap gap-2 pt-2">
+            <Skeleton className="h-6 w-16 rounded-full" />
+            <Skeleton className="h-6 w-20 rounded-full" />
+          </div>
+        </CardContent>
+        <CardFooter className="flex justify-between items-center bg-muted/50 p-3">
+           <Skeleton className="h-8 w-20 rounded-md" />
+           <Skeleton className="h-8 w-8 rounded-md" />
+        </CardFooter>
+      </Card>
+    )
   }
 
   return (

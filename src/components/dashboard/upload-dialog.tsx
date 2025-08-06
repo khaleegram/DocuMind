@@ -21,8 +21,10 @@ import type { Document } from '@/lib/types';
 import { Loader2, FileUp } from 'lucide-react';
 import { extractDocumentMetadata } from '@/ai/flows/extract-document-metadata';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { v4 as uuidv4 } from 'uuid';
+import { doc, addDoc, collection, serverTimestamp, updateDoc } from 'firebase/firestore';
+
 
 const uploadSchema = z.object({
   file: z
@@ -41,31 +43,7 @@ type UploadDialogProps = {
   onDocumentAdd: (newDocData: Omit<Document, 'id' | 'userId' | 'uploadedAt'>) => void;
 };
 
-// Function to get text from an image file
-const getTextFromImage = async (file: File): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const photoDataUri = e.target?.result as string;
-        // This is a simplified version. In a real app, you might need a more robust OCR solution.
-        // For this example, we'll imagine a hypothetical client-side OCR or send to a backend.
-        // Let's use AI to extract text from image data URI
-        const metadata = await extractDocumentMetadata({ documentText: photoDataUri });
-        resolve(JSON.stringify(metadata));
-      } catch (error) {
-        reject(error);
-      }
-    };
-    reader.onerror = (error) => {
-      reject(error);
-    };
-    reader.readAsDataURL(file);
-  });
-};
-
-
-export function UploadDialog({ isOpen, setIsOpen, onDocumentAdd }: UploadDialogProps) {
+export function UploadDialog({ isOpen, setIsOpen }: Omit<UploadDialogProps, 'onDocumentAdd'>) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [fileName, setFileName] = useState('');
   const { toast } = useToast();
@@ -91,12 +69,32 @@ export function UploadDialog({ isOpen, setIsOpen, onDocumentAdd }: UploadDialogP
       const storageRef = ref(storage, `documents/${user.uid}/${uniqueFileName}`);
       const snapshot = await uploadBytes(storageRef, file);
       const downloadURL = await getDownloadURL(snapshot.ref);
+
+      // 2. Create a placeholder document in Firestore
+      const docRef = await addDoc(collection(db, 'documents'), {
+        userId: user.uid,
+        fileName: uniqueFileName,
+        fileUrl: downloadURL,
+        uploadedAt: serverTimestamp(),
+        owner: 'Processing...',
+        type: 'Processing...',
+        keywords: [],
+        expiry: null,
+        isProcessing: true,
+      });
+
+      // Close dialog and reset form immediately
+      form.reset();
+      setFileName('');
+      setIsOpen(false);
+      toast({
+        title: 'Upload Started!',
+        description: 'Your document is being processed.',
+      });
   
-      // 2. Extract text from the file (image or PDF)
+      // 3. Process with Genkit AI in the background
       let documentText = '';
       if (file.type.startsWith('image/')) {
-        // In a real app, you would use a proper OCR service.
-        // We'll simulate by creating a data URI and passing to the AI flow.
         const reader = new FileReader();
         reader.readAsDataURL(file);
         const dataUrl = await new Promise<string>((resolve, reject) => {
@@ -105,42 +103,46 @@ export function UploadDialog({ isOpen, setIsOpen, onDocumentAdd }: UploadDialogP
         });
         documentText = dataUrl;
       } else {
-        // For non-image files, you'd need a different extraction method (e.g., PDF parser)
-        // For this prototype, we'll show a message that it's not supported for text extraction
-         toast({
-          title: 'File type not supported for text extraction',
-          description: `Can't extract text from ${file.type}. Please use an image.`,
-        });
         documentText = "No text could be extracted from this file type.";
       }
       
-      // 3. Process with Genkit AI
-      const metadata = await extractDocumentMetadata({ documentText });
-  
-      // 4. Add document metadata to Firestore
-      onDocumentAdd({
-        owner: metadata.owner,
-        company: metadata.documentType === 'Contract' || metadata.documentType === 'Receipt' ? metadata.owner : undefined,
-        type: metadata.documentType,
-        expiry: metadata.expiryDate,
-        keywords: metadata.keywords,
-        fileUrl: downloadURL,
-        fileName: uniqueFileName,
-      });
-  
-      toast({
-        title: 'Document Uploaded!',
-        description: `Successfully processed and saved "${metadata.documentType}" for ${metadata.owner}.`,
-      });
-      form.reset();
-      setFileName('');
-      setIsOpen(false);
+      try {
+        const metadata = await extractDocumentMetadata({ documentText });
+    
+        // 4. Update document with extracted metadata
+        await updateDoc(doc(db, 'documents', docRef.id), {
+          owner: metadata.owner,
+          company: metadata.documentType === 'Contract' || metadata.documentType === 'Receipt' ? metadata.owner : undefined,
+          type: metadata.documentType,
+          expiry: metadata.expiryDate,
+          keywords: metadata.keywords,
+          isProcessing: false,
+        });
+    
+        toast({
+          title: 'Document Processed!',
+          description: `Successfully processed and saved "${metadata.documentType}" for ${metadata.owner}.`,
+        });
+      } catch (aiError) {
+        console.error('Failed to process document with AI:', aiError);
+        await updateDoc(doc(db, 'documents', docRef.id), {
+          owner: 'Processing Failed',
+          type: 'Error',
+          isProcessing: false,
+        });
+        toast({
+          variant: 'destructive',
+          title: 'Processing Failed',
+          description: 'Could not extract metadata from the document.',
+        });
+      }
+
     } catch (error) {
       console.error('Failed to upload document:', error);
       toast({
         variant: 'destructive',
         title: 'Upload Failed',
-        description: 'Could not upload and process the document. Please try again.',
+        description: 'Could not upload the document. Please try again.',
       });
     } finally {
       setIsProcessing(false);
@@ -150,7 +152,13 @@ export function UploadDialog({ isOpen, setIsOpen, onDocumentAdd }: UploadDialogP
   const fileRef = form.register('file');
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      setIsOpen(open);
+      if (!open) {
+        form.reset();
+        setFileName('');
+      }
+    }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Upload Document</DialogTitle>
@@ -203,9 +211,9 @@ export function UploadDialog({ isOpen, setIsOpen, onDocumentAdd }: UploadDialogP
                 {isProcessing ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processing...
+                    Uploading...
                   </>
-                ) : "Upload & Process"}
+                ) : "Upload"}
               </Button>
             </DialogFooter>
           </form>

@@ -9,4 +9,5 @@ export type Document = {
   uploadedAt: string;
   fileUrl: string;
   fileName: string;
+  isProcessing?: boolean;
 };
