@@ -22,10 +22,10 @@ import { Loader2, FileUp } from 'lucide-react';
 import { extractDocumentMetadata } from '@/ai/flows/extract-document-metadata';
 import { enhanceSearchWithKeywords } from '@/ai/flows/enhance-search-with-keywords';
 import { extractTextFromImage } from '@/ai/flows/extract-text-from-image';
-import { auth, db } from '@/lib/firebase';
+import { auth, db, googleProvider } from '@/lib/firebase';
 import { v4 as uuidv4 } from 'uuid';
 import { doc, addDoc, collection, serverTimestamp, updateDoc } from 'firebase/firestore';
-import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 
 
 const uploadSchema = z.object({
@@ -43,6 +43,26 @@ type UploadDialogProps = {
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
 };
+
+// Helper function for retrying promises with exponential backoff
+const retryWithBackoff = async <T,>(
+  fn: () => Promise<T>,
+  retries = 3,
+  delay = 1000,
+  backoff = 2
+): Promise<T> => {
+  try {
+    return await fn();
+  } catch (error: any) {
+    if (retries > 0 && error.message?.includes('503')) {
+      await new Promise(res => setTimeout(res, delay));
+      return retryWithBackoff(fn, retries - 1, delay * backoff, backoff);
+    } else {
+      throw error;
+    }
+  }
+};
+
 
 export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -69,10 +89,8 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
     const uniqueFileName = `${uuidv4()}-${file.name}`;
   
     try {
-      const provider = new GoogleAuthProvider();
-      provider.addScope('https://www.googleapis.com/auth/drive.file');
       
-      const result = await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, googleProvider);
       const credential = GoogleAuthProvider.credentialFromResult(result);
 
       if (!credential || !credential.accessToken) {
@@ -154,14 +172,13 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
       });
       
       try {
-        // These AI flows can handle both image and PDF data URLs
         const [metadata, textExtraction] = await Promise.all([
-          extractDocumentMetadata({ documentDataUrl: dataUrl }),
-          extractTextFromImage({ documentDataUrl: dataUrl }),
+          retryWithBackoff(() => extractDocumentMetadata({ documentDataUrl: dataUrl })),
+          retryWithBackoff(() => extractTextFromImage({ documentDataUrl: dataUrl })),
         ]);
 
-        const { keywords } = await enhanceSearchWithKeywords({ documentText: textExtraction.text });
-        
+        const { keywords } = await retryWithBackoff(() => enhanceSearchWithKeywords({ documentText: textExtraction.text }));
+
         await updateDoc(doc(db, 'documents', docRef.id), { ...metadata, keywords, summary: metadata.summary, textContent: textExtraction.text, isProcessing: false });
 
         toast({
