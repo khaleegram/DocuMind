@@ -8,7 +8,7 @@ import { FileSearch, Loader2 } from 'lucide-react';
 import { auth, googleProvider } from '@/lib/firebase';
 import { signInWithPopup } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 
 export default function LoginPage() {
@@ -17,17 +17,18 @@ export default function LoginPage() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [user, loading] = useAuthState(auth);
 
-  if (loading) {
+  useEffect(() => {
+    if (user && !loading) {
+      router.push('/dashboard');
+    }
+  }, [user, loading, router]);
+
+  if (loading || user) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center p-4">
         <Loader2 className="h-16 w-16 animate-spin text-primary" />
       </main>
     );
-  }
-
-  if (user) {
-    router.push('/dashboard');
-    return null;
   }
 
   const handleLogin = async () => {
