@@ -95,11 +95,11 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
         body: file
       })
 
-      const fileMetadata = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFile.id}?fields=webViewLink,iconLink`, {
+      const fileMetadata = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFile.id}?fields=webViewLink,thumbnailLink`, {
           headers: new Headers({ 'Authorization': 'Bearer ' + accessToken })
       }).then(res => res.json());
 
-      const downloadURL = fileMetadata.webViewLink;
+      const downloadURL = fileMetadata.thumbnailLink;
 
       // 2. Create a placeholder document in Firestore
       const docRef = await addDoc(collection(db, 'documents'), {
@@ -134,7 +134,7 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
         
         try {
           const metadata = await extractDocumentMetadata({ documentDataUrl: dataUrl });
-          await updateDoc(doc(db, 'documents', docRef.id), { ...metadata, fileUrl: downloadURL, isProcessing: false });
+          await updateDoc(doc(db, 'documents', docRef.id), { ...metadata, isProcessing: false });
           toast({
             title: 'Processing Complete!',
             description: `Successfully analyzed and saved your ${metadata.documentType}.`,
@@ -157,7 +157,6 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
         await updateDoc(doc(db, 'documents', docRef.id), {
           owner: file.name,
           type: 'PDF Document',
-          fileUrl: downloadURL,
           isProcessing: false,
         });
         toast({
