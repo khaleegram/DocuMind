@@ -67,7 +67,7 @@ export default function DashboardPage() {
 
     let docToDelete: DocumentType | null = null;
     try {
-      // Fetch the latest document data from Firestore
+      // Fetch the latest document data from Firestore to ensure we have the driveFileId
       const docRef = doc(db, 'documents', docId);
       const docSnap = await getDoc(docRef);
 
@@ -76,7 +76,7 @@ export default function DashboardPage() {
       }
       docToDelete = { id: docSnap.id, ...docSnap.data() } as DocumentType;
 
-      // If there's no driveFileId, it might be an older record.
+      // If there's no driveFileId, it might be an older record or an upload failed.
       // Just delete it from Firestore.
       if (!docToDelete.driveFileId) {
         try {
