@@ -3,15 +3,17 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { FileText, Calendar, Building, MoreVertical, Link as LinkIcon, Trash2, Loader2, File, ChevronDown } from 'lucide-react';
+import { FileText, Calendar, Building, MoreVertical, Link as LinkIcon, Trash2, Loader2, File, ChevronDown, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 import { format, parseISO } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 export function DocumentCard({ document, onDelete }: { document: Document, onDelete: (doc: Document) => void }) {
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
+  const router = useRouter();
 
   if (document.isProcessing) {
     return (
@@ -38,8 +40,19 @@ export function DocumentCard({ document, onDelete }: { document: Document, onDel
     )
   }
 
+  const handleCardClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Prevent navigation when clicking on interactive elements
+    if ((e.target as HTMLElement).closest('button, a, [role="menuitem"]')) {
+      return;
+    }
+    router.push(`/dashboard/document/${document.id}`);
+  };
+
   return (
-    <Card className="flex flex-col overflow-hidden rounded-lg shadow-md transition-shadow hover:shadow-xl">
+    <Card 
+      onClick={handleCardClick}
+      className="flex flex-col overflow-hidden rounded-lg shadow-md transition-shadow hover:shadow-xl cursor-pointer"
+    >
       <CardHeader className="p-0">
         <div className="aspect-w-4 aspect-h-3 bg-muted flex items-center justify-center h-full">
           <File className="h-20 w-20 text-muted-foreground" />
@@ -66,7 +79,7 @@ export function DocumentCard({ document, onDelete }: { document: Document, onDel
           )}
         </div>
         {document.summary && (
-          <Collapsible open={isSummaryOpen} onOpenChange={setIsSummaryOpen} className="mt-4 text-sm">
+          <Collapsible open={isSummaryOpen} onOpenChange={setIsSummaryOpen} onClick={(e) => e.stopPropagation()} className="mt-4 text-sm">
             <p className={`text-muted-foreground ${!isSummaryOpen ? 'truncate' : ''}`}>
               {document.summary}
             </p>
@@ -89,9 +102,15 @@ export function DocumentCard({ document, onDelete }: { document: Document, onDel
       </CardContent>
       <CardFooter className="flex justify-between items-center bg-muted/50 p-3">
         <Button asChild size="sm" variant="outline" className="text-accent-foreground bg-accent hover:bg-accent/90 border-0">
-          <Link href={document.fileUrl} target="_blank" rel="noopener noreferrer">
+          <Link href={document.fileUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
             <LinkIcon className="mr-2 h-4 w-4" />
             View
+          </Link>
+        </Button>
+         <Button asChild size="sm" variant="outline" >
+          <Link href={`/dashboard/document/${document.id}`} onClick={(e) => e.stopPropagation()}>
+            <MessageSquare className="mr-2 h-4 w-4" />
+            Chat
           </Link>
         </Button>
         <DropdownMenu>

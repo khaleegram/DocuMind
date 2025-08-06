@@ -11,4 +11,5 @@ export type Document = {
   fileName: string;
   isProcessing?: boolean;
   summary?: string;
+  textContent: string;
 };

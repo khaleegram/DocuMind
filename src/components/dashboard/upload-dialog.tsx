@@ -25,7 +25,7 @@ import { extractTextFromImage } from '@/ai/flows/extract-text-from-image';
 import { auth, db } from '@/lib/firebase';
 import { v4 as uuidv4 } from 'uuid';
 import { doc, addDoc, collection, serverTimestamp, updateDoc } from 'firebase/firestore';
-import { GoogleAuthProvider, getAdditionalUserInfo, signInWithPopup } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 
 
 const uploadSchema = z.object({
@@ -69,9 +69,6 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
       const provider = new GoogleAuthProvider();
       provider.addScope('https://www.googleapis.com/auth/drive.file');
       
-      // We need to get the credential from the original sign-in.
-      // A simple way is to re-trigger the popup, Firebase often caches this
-      // and it happens instantly without user interaction.
       const result = await signInWithPopup(auth, provider);
       const credential = GoogleAuthProvider.credentialFromResult(result);
 
@@ -129,6 +126,7 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
         type: 'Processing...',
         keywords: [],
         summary: 'Processing...',
+        textContent: '',
         expiry: null,
         isProcessing: true,
       });
@@ -159,7 +157,7 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
 
           const { keywords } = await enhanceSearchWithKeywords({ documentText: textExtraction.text });
           
-          await updateDoc(doc(db, 'documents', docRef.id), { ...metadata, keywords, summary: metadata.summary, isProcessing: false });
+          await updateDoc(doc(db, 'documents', docRef.id), { ...metadata, keywords, summary: metadata.summary, textContent: textExtraction.text, isProcessing: false });
 
           toast({
             title: 'Processing Complete!',
@@ -186,6 +184,7 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
           type: 'PDF Document',
           keywords: [file.name.split('.')[0]],
           summary: 'PDF content analysis is not yet supported.',
+          textContent: 'PDF content analysis is not yet supported.',
           isProcessing: false,
         });
         toast({
