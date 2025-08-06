@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { FileText, Calendar, Building, MoreVertical, Link as LinkIcon, Trash2, Loader2, File, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { format, parseISO } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -13,23 +12,6 @@ import { useState } from 'react';
 
 export function DocumentCard({ document, onDelete }: { document: Document, onDelete: (doc: Document) => void }) {
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
-
-  const getAiHint = (type: string) => {
-    switch (type.toLowerCase()) {
-      case 'passport':
-        return 'passport document';
-      case 'contract':
-        return 'contract paper';
-      case 'receipt':
-        return 'bill receipt';
-      case 'visa':
-        return 'visa stamp';
-      default:
-        return 'document paper';
-    }
-  }
-
-  const isImage = document.fileUrl && !document.fileUrl.includes('drive.google.com');
 
   if (document.isProcessing) {
     return (
@@ -59,21 +41,8 @@ export function DocumentCard({ document, onDelete }: { document: Document, onDel
   return (
     <Card className="flex flex-col overflow-hidden rounded-lg shadow-md transition-shadow hover:shadow-xl">
       <CardHeader className="p-0">
-        <div className="aspect-w-4 aspect-h-3">
-          {isImage ? (
-            <Image 
-              src={document.fileUrl} 
-              alt={document.type} 
-              width={400} 
-              height={300} 
-              className="object-cover" 
-              data-ai-hint={getAiHint(document.type)}
-            />
-          ) : (
-            <div className="bg-muted flex items-center justify-center h-full">
-                <File className="h-20 w-20 text-muted-foreground" />
-            </div>
-          )}
+        <div className="aspect-w-4 aspect-h-3 bg-muted flex items-center justify-center h-full">
+          <File className="h-20 w-20 text-muted-foreground" />
         </div>
       </CardHeader>
       <CardContent className="flex-1 p-4">

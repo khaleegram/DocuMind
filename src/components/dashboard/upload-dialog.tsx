@@ -97,19 +97,23 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
         body: file
       });
       
-      const fileMetadata = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFile.id}?fields=webViewLink,thumbnailLink`, {
+      const fileMetadata = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFile.id}?fields=webViewLink`, {
           headers: new Headers({ 'Authorization': 'Bearer ' + accessToken })
       }).then(res => res.json());
 
-      const isImage = file.type.startsWith('image/');
       const fileUrl = fileMetadata.webViewLink;
-      const imageUrl = isImage ? fileMetadata.thumbnailLink : fileMetadata.webViewLink;
+
+      if (!fileUrl) {
+        throw new Error("Could not get file URL from Google Drive.");
+      }
+
+      const isImage = file.type.startsWith('image/');
 
       // 2. Create a placeholder document in Firestore
       const docRef = await addDoc(collection(db, 'documents'), {
         userId: user.uid,
         fileName: uniqueFileName,
-        fileUrl: imageUrl,
+        fileUrl: fileUrl,
         uploadedAt: serverTimestamp(),
         owner: 'Processing...',
         type: 'Processing...',
@@ -138,7 +142,6 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
         });
         
         try {
-          // concurrently run metadata extraction and keyword generation
           const [metadata, textExtraction] = await Promise.all([
             extractDocumentMetadata({ documentDataUrl: dataUrl }),
             extractTextFromImage({ documentDataUrl: dataUrl }),
