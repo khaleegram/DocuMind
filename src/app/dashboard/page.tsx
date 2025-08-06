@@ -14,6 +14,9 @@ import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { googleProvider } from '@/lib/firebase';
+import FilterSidebar from '@/components/dashboard/filter-sidebar';
+
+export type FilterCategory = 'owner' | 'type' | 'keywords' | 'company';
 
 export default function DashboardPage() {
   const [user, loading] = useAuthState(auth);
@@ -22,6 +25,12 @@ export default function DashboardPage() {
   const [isLoadingDocs, setIsLoadingDocs] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [isUploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [activeFilters, setActiveFilters] = useState<Record<FilterCategory, Set<string>>>({
+    owner: new Set(),
+    type: new Set(),
+    keywords: new Set(),
+    company: new Set(),
+  });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -51,16 +60,69 @@ export default function DashboardPage() {
 }, [user, loading, router]);
 
 
+  const filterOptions = useMemo(() => {
+    const options: Record<FilterCategory, Set<string>> = {
+      owner: new Set(),
+      type: new Set(),
+      keywords: new Set(),
+      company: new Set(),
+    };
+    documents.forEach(doc => {
+      if (doc.owner) options.owner.add(doc.owner);
+      if (doc.type) options.type.add(doc.type);
+      if (doc.company) options.company.add(doc.company);
+      doc.keywords.forEach(k => options.keywords.add(k));
+    });
+    return {
+        owner: Array.from(options.owner).sort(),
+        type: Array.from(options.type).sort(),
+        keywords: Array.from(options.keywords).sort(),
+        company: Array.from(options.company).sort(),
+    }
+  }, [documents]);
+
+  const handleFilterChange = (category: FilterCategory, value: string) => {
+    setActiveFilters(prev => {
+        const newSet = new Set(prev[category]);
+        if (newSet.has(value)) {
+            newSet.delete(value);
+        } else {
+            newSet.add(value);
+        }
+        return { ...prev, [category]: newSet };
+    });
+  };
+  
   const filteredDocuments = useMemo(() => {
-    if (!searchQuery) return documents;
-    const lowercasedQuery = searchQuery.toLowerCase();
-    return documents.filter(doc => 
-        (doc.owner && doc.owner.toLowerCase().includes(lowercasedQuery)) ||
-        (doc.company && doc.company.toLowerCase().includes(lowercasedQuery)) ||
-        (doc.type && doc.type.toLowerCase().includes(lowercasedQuery)) ||
-        (doc.keywords && doc.keywords.some(k => k.toLowerCase().includes(lowercasedQuery)))
-    );
-  }, [documents, searchQuery]);
+    let filtered = documents;
+
+    // Apply text search
+    if (searchQuery) {
+        const lowercasedQuery = searchQuery.toLowerCase();
+        filtered = filtered.filter(doc => 
+            (doc.owner && doc.owner.toLowerCase().includes(lowercasedQuery)) ||
+            (doc.company && doc.company.toLowerCase().includes(lowercasedQuery)) ||
+            (doc.type && doc.type.toLowerCase().includes(lowercasedQuery)) ||
+            (doc.keywords && doc.keywords.some(k => k.toLowerCase().includes(lowercasedQuery)))
+        );
+    }
+    
+    // Apply sidebar filters
+    Object.entries(activeFilters).forEach(([category, values]) => {
+        if (values.size > 0) {
+            filtered = filtered.filter(doc => {
+                const cat = category as FilterCategory;
+                if (cat === 'keywords') {
+                    return doc.keywords && doc.keywords.some(k => values.has(k));
+                }
+                const docValue = doc[cat];
+                return docValue && values.has(docValue);
+            });
+        }
+    });
+
+    return filtered;
+  }, [documents, searchQuery, activeFilters]);
 
  const handleDeleteDocument = async (docId: string) => {
     if (!user) return;
@@ -74,20 +136,11 @@ export default function DashboardPage() {
       const docToDelete = { id: docSnap.id, ...docSnap.data() } as DocumentType;
 
       if (!docToDelete.driveFileId) {
-        try {
           await deleteDoc(docRef);
           toast({
             title: 'Document Record Deleted',
-            description: `Removed ${docToDelete.fileName} from your list. The file was not on Google Drive.`,
+            description: `Removed ${docToDelete.fileName} from your list.`,
           });
-        } catch (error: any) {
-          console.error("Error deleting firestore document: ", error);
-          toast({
-              variant: 'destructive',
-              title: 'Deletion Failed',
-              description: 'Could not delete the document record from Firestore.',
-          });
-        }
         return;
       }
       
@@ -141,22 +194,30 @@ export default function DashboardPage() {
   }
   
   return (
-    <div className="flex flex-col h-screen overflow-hidden sm:overflow-auto">
-      <Header 
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        onUploadClick={() => setUploadDialogOpen(true)}
-        title="My Documents"
+    <div className="flex h-screen">
+      <FilterSidebar 
+        filterOptions={filterOptions}
+        activeFilters={activeFilters}
+        onFilterChange={handleFilterChange}
+        onClearFilters={() => setActiveFilters({ owner: new Set(), type: new Set(), keywords: new Set(), company: new Set() })}
       />
-      <main className="flex-1 overflow-y-auto p-4 md:p-0">
-        {isLoadingDocs ? (
-           <div className="flex items-center justify-center pt-20">
-             <Loader2 className="h-16 w-16 animate-spin text-primary" />
-           </div>
-        ) : (
-          <DocumentList documents={filteredDocuments} onDelete={handleDeleteDocument} />
-        )}
-      </main>
+      <div className="flex flex-col flex-1 overflow-hidden">
+        <Header 
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          onUploadClick={() => setUploadDialogOpen(true)}
+          title="My Documents"
+        />
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+          {isLoadingDocs ? (
+            <div className="flex items-center justify-center pt-20">
+              <Loader2 className="h-16 w-16 animate-spin text-primary" />
+            </div>
+          ) : (
+            <DocumentList documents={filteredDocuments} onDelete={handleDeleteDocument} />
+          )}
+        </main>
+      </div>
       <UploadDialog 
         isOpen={isUploadDialogOpen}
         setIsOpen={setUploadDialogOpen}
@@ -164,5 +225,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    
