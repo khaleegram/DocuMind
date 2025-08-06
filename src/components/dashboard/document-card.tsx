@@ -112,8 +112,8 @@ export function DocumentCard({ document, onDelete }: { document: Document, onDel
             </Collapsible>
         )}
         <div className="mt-4 flex flex-wrap gap-2">
-          {document.keywords.map((keyword) => (
-            <Badge key={keyword} variant="secondary">{keyword}</Badge>
+          {document.keywords.map((keyword, index) => (
+            <Badge key={`${keyword}-${index}`} variant="secondary">{keyword}</Badge>
           ))}
         </div>
       </CardContent>
