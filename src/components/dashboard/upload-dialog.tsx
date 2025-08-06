@@ -29,12 +29,12 @@ import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 
 
 const uploadSchema = z.object({
-  file: z
+  files: z
     .any()
-    .refine((files) => files?.length === 1, 'File is required.')
-    .refine((files) => files?.[0]?.size <= 5000000, `Max file size is 5MB.`)
+    .refine((files) => files?.length > 0, 'At least one file is required.')
+    .refine((files) => Array.from(files).every((file: any) => file.size <= 5000000), `Max file size is 5MB per file.`)
     .refine(
-      (files) => ["image/jpeg", "image/png", "application/pdf"].includes(files?.[0]?.type),
+      (files) => Array.from(files).every((file: any) => ["image/jpeg", "image/png", "application/pdf"].includes(file?.type)),
       "Only .jpg, .png and .pdf files are accepted."
     ),
 });
@@ -142,42 +142,20 @@ const getDocuMindFolderId = async (accessToken: string) => {
 
 export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
   const [isProcessing, setIsProcessing] = useState(false);
-  const [fileName, setFileName] = useState('');
+  const [fileNames, setFileNames] = useState<string[]>([]);
   const { toast } = useToast();
   const form = useForm<z.infer<typeof uploadSchema>>({
     resolver: zodResolver(uploadSchema),
     defaultValues: {
-      file: undefined,
+      files: undefined,
     }
   });
 
-  const onSubmit = async (values: z.infer<typeof uploadSchema>) => {
-    setIsProcessing(true);
-    const user = auth.currentUser;
-
-    if (!user) {
-      toast({ variant: 'destructive', title: 'Not Authenticated', description: 'You must be logged in to upload documents.' });
-      setIsProcessing(false);
-      return;
-    }
-  
-    const file = values.file[0];
-    const uniqueFileName = `${uuidv4()}-${file.name}`;
-  
-    try {
+  const processFile = async (file: File, accessToken: string, user: any) => {
+      const uniqueFileName = `${uuidv4()}-${file.name}`;
       
-      const result = await signInWithPopup(auth, googleProvider);
-      const credential = GoogleAuthProvider.credentialFromResult(result);
-
-      if (!credential || !credential.accessToken) {
-        throw new Error("Could not retrieve a valid access token. Please sign in again.");
-      }
-      const accessToken = credential.accessToken;
-      
-      // Get or create the main "DocuMind" folder
       const docuMindFolderId = await getDocuMindFolderId(accessToken);
-
-      // Temporary placeholder metadata to decide folder name
+      
       const readerForMetadata = new FileReader();
       readerForMetadata.readAsDataURL(file);
       const dataUrlForMetadata = await new Promise<string>((resolve, reject) => {
@@ -187,10 +165,8 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
       const tempMetadata = await retryWithBackoff(() => extractDocumentMetadata({ documentDataUrl: dataUrlForMetadata }));
       const folderName = tempMetadata.company || tempMetadata.owner;
       
-      // Get or create the specific person/org folder
       const targetFolder = await getOrCreateFolder(accessToken, folderName, docuMindFolderId);
-
-      // 1. Upload file to Google Drive in the correct folder
+      
       const driveMetadataResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
         method: 'POST',
         headers: new Headers({ 
@@ -209,7 +185,7 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
         throw new Error(errorBody.error.message);
       }
       const driveFile = await driveMetadataResponse.json();
-
+      
       const mediaUploadResponse = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFile.id}?uploadType=media`, {
         method: 'PATCH',
         headers: new Headers({
@@ -218,24 +194,19 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
         }),
         body: file
       });
-
       if (!mediaUploadResponse.ok) {
          const errorBody = await mediaUploadResponse.json().catch(() => ({ error: { message: "Unknown error during Drive media upload." }}));
          throw new Error(errorBody.error.message);
       }
-      
+
       const fileMetadata = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFile.id}?fields=webViewLink,thumbnailLink`, {
           headers: new Headers({ 'Authorization': 'Bearer ' + accessToken })
       }).then(res => res.json());
 
       const fileUrl = fileMetadata.webViewLink;
       const thumbnailUrl = fileMetadata.thumbnailLink || null;
+      if (!fileUrl) throw new Error("Could not get file URL from Google Drive.");
 
-      if (!fileUrl) {
-        throw new Error("Could not get file URL from Google Drive.");
-      }
-
-      // 2. Create a placeholder document in Firestore
       const docRef = await addDoc(collection(db, 'documents'), {
         userId: user.uid,
         fileName: uniqueFileName,
@@ -256,45 +227,60 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
         isProcessing: true,
       });
 
-      // Close dialog and reset form immediately
-      form.reset();
-      setFileName('');
-      setIsOpen(false);
-      
-      // Handle AI processing in the background
-      toast({
-        title: 'Upload successful!',
-        description: 'Your document is now being organized by the AI.',
-      });
-      
+      toast({ title: `Uploading ${file.name}`, description: 'Your document is now being organized by the AI.' });
+
       try {
         const [textExtraction] = await Promise.all([
-          // metadata already fetched as tempMetadata
           retryWithBackoff(() => extractTextFromImage({ documentDataUrl: dataUrlForMetadata })),
         ]);
-
         const { keywords } = await retryWithBackoff(() => enhanceSearchWithKeywords({ documentText: textExtraction.text }));
-
         await updateDoc(doc(db, 'documents', docRef.id), { ...tempMetadata, keywords, summary: tempMetadata.summary, textContent: textExtraction.text, isProcessing: false });
-
-        toast({
-          title: 'Processing Complete!',
-          description: `Successfully analyzed and saved your ${tempMetadata.documentType}.`,
-        });
+        toast({ title: `Processing Complete for ${file.name}!`, description: `Successfully analyzed and saved your ${tempMetadata.documentType}.` });
       } catch (aiError) {
-        console.error('Failed to process document with AI:', aiError);
-        await updateDoc(doc(db, 'documents', docRef.id), {
-          owner: file.name,
-          type: 'Processing Failed',
-          summary: 'Could not analyze this document.',
-          isProcessing: false,
-        });
-        toast({
-          variant: 'destructive',
-          title: 'AI Processing Failed',
-          description: 'Could not extract metadata from the document.',
-        });
+        console.error(`Failed to process ${file.name} with AI:`, aiError);
+        await updateDoc(doc(db, 'documents', docRef.id), { owner: file.name, type: 'Processing Failed', summary: 'Could not analyze this document.', isProcessing: false });
+        toast({ variant: 'destructive', title: 'AI Processing Failed', description: `Could not extract metadata from ${file.name}.` });
       }
+  };
+
+  const onSubmit = async (values: z.infer<typeof uploadSchema>) => {
+    setIsProcessing(true);
+    const user = auth.currentUser;
+
+    if (!user) {
+      toast({ variant: 'destructive', title: 'Not Authenticated', description: 'You must be logged in to upload documents.' });
+      setIsProcessing(false);
+      return;
+    }
+
+    const files = Array.from(values.files) as File[];
+
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      if (!credential || !credential.accessToken) {
+        throw new Error("Could not retrieve a valid access token. Please sign in again.");
+      }
+      const accessToken = credential.accessToken;
+      
+      setIsOpen(false);
+      form.reset();
+      setFileNames([]);
+
+      toast({
+          title: `Starting upload of ${files.length} documents...`,
+          description: 'You can continue to use the app while processing happens.',
+      });
+
+      for (const file of files) {
+          try {
+              await processFile(file, accessToken, user);
+          } catch(fileError: any) {
+               console.error(`Failed to upload file ${file.name}:`, fileError);
+               toast({ variant: 'destructive', title: `Upload Failed for ${file.name}`, description: fileError.message || 'Could not upload this document.' });
+          }
+      }
+
     } catch (error: any) {
       console.error('Failed to upload document:', error);
       let description = 'Could not upload the document. Please try again.';
@@ -303,18 +289,13 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
       } else if (error.message) {
         description = error.message;
       }
-      
-      toast({
-        variant: 'destructive',
-        title: 'Upload Failed',
-        description: description,
-      });
+      toast({ variant: 'destructive', title: 'Upload Failed', description: description });
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const fileRef = form.register('file');
+  const fileRef = form.register('files');
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
@@ -322,43 +303,48 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
         setIsOpen(open);
         if (!open) {
           form.reset();
-          setFileName('');
+          setFileNames([]);
         }
       }
     }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Upload Document</DialogTitle>
+          <DialogTitle>Upload Document(s)</DialogTitle>
           <DialogDescription>
-            Select a document file to upload. The system will automatically organize it for you.
+            Select one or more document files to upload. The system will automatically organize them for you.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <FormField
               control={form.control}
-              name="file"
+              name="files"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel htmlFor="file-upload" className="sr-only">Document File</FormLabel>
                   <FormControl>
                     <div className="flex items-center justify-center w-full">
                         <label htmlFor="file-upload" className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-lg cursor-pointer bg-card hover:bg-muted/50">
-                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                            <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center">
                                 <FileUp className="w-10 h-10 mb-3 text-muted-foreground" />
-                                {fileName ? (
-                                    <p className="font-semibold text-primary">{fileName}</p>
+                                {fileNames.length > 0 ? (
+                                    <div className="text-sm font-semibold text-primary px-2">
+                                        {fileNames.length === 1 ? fileNames[0] : `${fileNames.length} files selected`}
+                                        {fileNames.length > 1 && 
+                                            <p className="text-xs text-muted-foreground font-normal mt-1 truncate max-w-xs">{fileNames.join(', ')}</p>
+                                        }
+                                    </div>
                                 ) : (
                                   <>
                                     <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
-                                    <p className="text-xs text-muted-foreground">PDF, PNG, JPG, etc.</p>
+                                    <p className="text-xs text-muted-foreground">PDF, PNG, JPG, etc. (multi-select enabled)</p>
                                   </>
                                 )}
                             </div>
-                            <Input id="file-upload" type="file" className="hidden" {...fileRef} onChange={(e) => {
+                            <Input id="file-upload" type="file" multiple className="hidden" {...fileRef} onChange={(e) => {
                                 field.onChange(e.target.files);
                                 if (e.target.files && e.target.files.length > 0) {
-                                    setFileName(e.target.files[0].name);
+                                    setFileNames(Array.from(e.target.files).map(f => f.name));
                                 }
                             }} />
                         </label>
@@ -374,13 +360,13 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
                   Cancel
                 </Button>
               </DialogClose>
-              <Button type="submit" disabled={isProcessing} className="bg-accent hover:bg-accent/90">
+              <Button type="submit" disabled={isProcessing || fileNames.length === 0} className="bg-accent hover:bg-accent/90">
                 {isProcessing ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Uploading...
                   </>
-                ) : "Upload"}
+                ) : `Upload ${fileNames.length > 0 ? fileNames.length : ''} file(s)`}
               </Button>
             </DialogFooter>
           </form>

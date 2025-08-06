@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 export const metadata: Metadata = {
   title: 'DocuMind',
   description: 'Scan, upload, and organize any document automatically.',
+  manifest: '/manifest.json',
 };
 
 export default function RootLayout({
