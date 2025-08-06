@@ -2,10 +2,6 @@
   "name": "DocuMind",
   "short_name": "DocuMind",
   "description": "Scan, upload, and organize any document automatically.",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#F0F2F5",
-  "theme_color": "#3F51B5",
   "icons": [
     {
       "src": "/icon-192x192.png",
@@ -17,5 +13,9 @@
       "sizes": "512x512",
       "type": "image/png"
     }
-  ]
+  ],
+  "theme_color": "#ffffff",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "start_url": "/"
 }

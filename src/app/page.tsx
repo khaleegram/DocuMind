@@ -59,12 +59,14 @@ export default function LoginPage() {
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-4 bg-muted/40">
-      <div className="w-full max-w-md">
-        <Card className="shadow-2xl rounded-xl border-0">
-          <CardHeader className="text-center p-8">
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 text-primary mb-6">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-10 w-10"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M12.5 13h-1a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1h1a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1h-1"></path><path d="M17.5 13h-1a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1h1a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1h-1"></path></svg>
-            </div>
+  <div className="w-full max-w-md">
+    <Card className="shadow-2xl rounded-xl border-0">
+      <CardHeader className="text-center p-8">
+        <img
+          src="/icon.png" // PNG in public folder
+          alt="App Icon"
+          className="mx-auto h-40 w-40 object-contain mb-6"
+        />
             <CardTitle className="text-4xl font-bold tracking-tight text-primary">DocuMind</CardTitle>
             <CardDescription className="text-lg mt-2 text-muted-foreground">Your intelligent document assistant.</CardDescription>
           </CardHeader>
