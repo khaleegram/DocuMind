@@ -113,6 +113,7 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
         owner: 'Processing...',
         type: 'Processing...',
         keywords: [],
+        summary: 'Processing...',
         expiry: null,
         isProcessing: true,
       });
@@ -155,6 +156,7 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
           await updateDoc(doc(db, 'documents', docRef.id), {
             owner: file.name,
             type: 'Processing Failed',
+            summary: 'Could not analyze this document.',
             isProcessing: false,
           });
           toast({
@@ -169,6 +171,7 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
           owner: file.name,
           type: 'PDF Document',
           keywords: [file.name.split('.')[0]],
+          summary: 'PDF content analysis is not yet supported.',
           isProcessing: false,
         });
         toast({

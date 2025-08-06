@@ -25,6 +25,7 @@ const ExtractDocumentMetadataOutputSchema = z.object({
   documentType: z.string().describe('The type of document (e.g., Passport, Drivers License, Contract, Receipt).'),
   expiryDate: z.string().nullable().describe('The expiration date of the document in YYYY-MM-DD format, or null if not found.'),
   keywords: z.array(z.string()).describe('A list of 3-5 relevant keywords for search.'),
+  summary: z.string().describe("A concise, one-to-two sentence summary of the document's content."),
 });
 export type ExtractDocumentMetadataOutput = z.infer<
   typeof ExtractDocumentMetadataOutputSchema
@@ -49,6 +50,7 @@ const prompt = ai.definePrompt({
   - **Document Type:** Determine the type of document (e.g., Passport, Drivers License, Contract, Receipt, Invoice).
   - **Expiry Date:** Find the expiration date and format it as YYYY-MM-DD. If no expiry date is present, use null.
   - **Keywords:** Generate 3-5 relevant keywords from the document's content that would be useful for a search.
+  - **Summary:** Provide a brief, one-to-two sentence summary of the document's main content.
 
   Return the extracted data in the specified JSON format.
   `,

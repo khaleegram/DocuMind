@@ -3,14 +3,17 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { FileText, Calendar, Building, MoreVertical, Link as LinkIcon, Trash2, Loader2, File } from 'lucide-react';
+import { FileText, Calendar, Building, MoreVertical, Link as LinkIcon, Trash2, Loader2, File, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { format, parseISO } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
-
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { useState } from 'react';
 
 export function DocumentCard({ document, onDelete }: { document: Document, onDelete: (doc: Document) => void }) {
+  const [isSummaryOpen, setIsSummaryOpen] = useState(false);
+
   const getAiHint = (type: string) => {
     switch (type.toLowerCase()) {
       case 'passport':
@@ -93,6 +96,22 @@ export function DocumentCard({ document, onDelete }: { document: Document, onDel
             </div>
           )}
         </div>
+        {document.summary && (
+          <Collapsible open={isSummaryOpen} onOpenChange={setIsSummaryOpen} className="mt-4 text-sm">
+            <p className={`text-muted-foreground ${!isSummaryOpen ? 'truncate' : ''}`}>
+              {document.summary}
+            </p>
+            <CollapsibleTrigger asChild>
+              <Button variant="link" className="p-0 h-auto text-xs text-accent">
+                {isSummaryOpen ? 'Read Less' : 'Read More'}
+                <ChevronDown className={`ml-1 h-3 w-3 transition-transform ${isSummaryOpen ? 'rotate-180' : ''}`} />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <p className="text-muted-foreground mt-2">{document.summary}</p>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
         <div className="mt-4 flex flex-wrap gap-2">
           {document.keywords.map((keyword) => (
             <Badge key={keyword} variant="secondary">{keyword}</Badge>

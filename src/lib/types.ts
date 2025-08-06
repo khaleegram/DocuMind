@@ -10,4 +10,5 @@ export type Document = {
   fileUrl: string;
   fileName: string;
   isProcessing?: boolean;
+  summary?: string;
 };
