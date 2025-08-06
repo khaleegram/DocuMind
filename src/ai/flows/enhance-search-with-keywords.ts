@@ -34,4 +34,17 @@ const prompt = ai.definePrompt({
 
   Document Text: {{{documentText}}}
 
-  Keywords:`, // Removed the 
+  Keywords:`,
+});
+
+const enhanceSearchWithKeywordsFlow = ai.defineFlow(
+  {
+    name: 'enhanceSearchWithKeywordsFlow',
+    inputSchema: EnhanceSearchWithKeywordsInputSchema,
+    outputSchema: EnhanceSearchWithKeywordsOutputSchema,
+  },
+  async (input) => {
+    const { output } = await prompt(input);
+    return output!;
+  }
+);
