@@ -95,20 +95,21 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
             'Content-Type': file.type,
         }),
         body: file
-      })
-
+      });
+      
       const fileMetadata = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFile.id}?fields=webViewLink,thumbnailLink`, {
           headers: new Headers({ 'Authorization': 'Bearer ' + accessToken })
       }).then(res => res.json());
 
       const isImage = file.type.startsWith('image/');
-      const fileUrl = isImage ? fileMetadata.thumbnailLink : fileMetadata.webViewLink;
+      const fileUrl = fileMetadata.webViewLink;
+      const imageUrl = isImage ? fileMetadata.thumbnailLink : fileMetadata.webViewLink;
 
       // 2. Create a placeholder document in Firestore
       const docRef = await addDoc(collection(db, 'documents'), {
         userId: user.uid,
         fileName: uniqueFileName,
-        fileUrl: fileUrl,
+        fileUrl: imageUrl,
         uploadedAt: serverTimestamp(),
         owner: 'Processing...',
         type: 'Processing...',
