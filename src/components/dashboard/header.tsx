@@ -32,14 +32,18 @@ type HeaderProps = {
   showAiSearch?: boolean;
 };
 
-function AiSearchAgent({ onAiSearch, isSearching }: { onAiSearch: (query: string) => void, isSearching: boolean }) {
-    const [query, setQuery] = useState('');
+function AiSearchAgent({ onAiSearch, isSearching, initialQuery }: { onAiSearch: (query: string) => void, isSearching: boolean, initialQuery?: string }) {
+    const [query, setQuery] = useState(initialQuery || '');
     
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!query.trim() || isSearching) return;
         onAiSearch(query);
     }
+
+     useEffect(() => {
+        setQuery(initialQuery || '');
+    }, [initialQuery]);
     
     return (
         <form onSubmit={handleSearch} className="relative flex-1 ml-auto sm:flex-grow-0">
@@ -137,7 +141,7 @@ export default function Header({
       <div className="flex w-full items-center gap-4">
         <h1 className="flex-1 shrink-0 text-xl font-semibold md:text-2xl whitespace-nowrap">{title}</h1>
         <div className="ml-auto flex items-center gap-2">
-            {showAiSearch && onAiSearch && <AiSearchAgent onAiSearch={onAiSearch} isSearching={isAiSearching} />}
+            {showAiSearch && onAiSearch && <AiSearchAgent onAiSearch={onAiSearch} isSearching={isAiSearching} initialQuery={searchQuery} />}
             {showSearch && onSearchSubmit && setSearchQuery && (
                  <form onSubmit={handleFormSubmit} className="relative flex-1 ml-auto sm:flex-grow-0">
                     <Input

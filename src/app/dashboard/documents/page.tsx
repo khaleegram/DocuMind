@@ -140,18 +140,17 @@ export default function AllDocumentsPage() {
  const handleAiSearch = useCallback(async (searchString: string) => {
     setIsAiSearching(true);
     // Clear manual filters and search to avoid confusion
-    setActiveFilters({ owner: new Set(), type: new Set(), company: new Set(), country: new Set() });
-    setSearchQuery('');
-    setSubmittedSearchQuery('');
+    clearFilters();
+    setSearchQuery(searchString); // Put the query in the search bar for context
 
     try {
       const documentsToSearch = documents.map(doc => ({
         id: doc.id,
         owner: doc.owner,
         type: doc.type,
-        company: doc.company,
-        country: doc.country,
-        summary: doc.summary || '',
+        company: doc.company ?? null,
+        country: doc.country ?? null,
+        summary: doc.summary ?? null,
         keywords: doc.keywords,
       }));
 
@@ -175,7 +174,7 @@ export default function AllDocumentsPage() {
     } finally {
         setIsAiSearching(false);
     }
-  }, [documents, toast]);
+  }, [documents, toast, clearFilters]);
 
 
  const handleDeleteDocument = async (docId: string) => {
@@ -323,7 +322,7 @@ export default function AllDocumentsPage() {
             </div>
           ) : (
              showEmptyState
-             ? <EmptyState /> 
+             ? <EmptyState onClear={clearFilters} isFiltered={aiSearchResults !== null || submittedSearchQuery.length > 0}/> 
              : <DocumentList documents={displayedDocuments} onDelete={handleDeleteDocument} />
           )}
         </main>
@@ -335,3 +334,4 @@ export default function AllDocumentsPage() {
     </div>
   );
 }
+
