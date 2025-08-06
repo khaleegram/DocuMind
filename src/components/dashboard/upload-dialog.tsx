@@ -24,6 +24,7 @@ import { extractTextFromImage } from '@/ai/flows/extract-text-from-image';
 import { auth, db } from '@/lib/firebase';
 import { v4 as uuidv4 } from 'uuid';
 import { doc, addDoc, collection, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { GoogleAuthProvider } from 'firebase/auth';
 
 
 const uploadSchema = z.object({
@@ -64,12 +65,14 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
     const uniqueFileName = `${uuidv4()}-${file.name}`;
   
     try {
-      const accessToken = sessionStorage.getItem('google-access-token');
-
-      if (!accessToken) {
-        throw new Error("No access token found. Please sign in again.");
+      const credential = GoogleAuthProvider.credentialFromError(user.providerData[0] as any) ?? 
+                         GoogleAuthProvider.credential(await user.getIdToken());
+      
+      if (!credential || !credential.accessToken) {
+        throw new Error("Could not retrieve a valid access token. Please sign in again.");
       }
-
+      const accessToken = credential.accessToken;
+      
       // 1. Upload file to Google Drive
       const driveResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
         method: 'POST',
@@ -97,7 +100,7 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
         body: file
       });
       
-      const fileMetadata = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFile.id}?fields=webViewLink`, {
+      const fileMetadata = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFile.id}?fields=webViewLink,thumbnailLink`, {
           headers: new Headers({ 'Authorization': 'Bearer ' + accessToken })
       }).then(res => res.json());
 
