@@ -24,11 +24,19 @@ import {
 import { auth } from '@/lib/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useState, useEffect } from 'react';
 
 function MainSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [user, loading] = useAuthState(auth);
+  const [initial, setInitial] = useState('');
+
+  useEffect(() => {
+    if (user && !loading) {
+      setInitial(user.displayName?.charAt(0)?.toUpperCase() || '');
+    }
+  }, [user, loading]);
 
   const handleLogout = async () => {
     await auth.signOut();
@@ -85,7 +93,7 @@ function MainSidebar() {
                      <Avatar className="h-8 w-8">
                         {user && <AvatarImage src={user.photoURL || ''} alt={user.displayName || 'User Avatar'} data-ai-hint="profile picture" />}
                         <AvatarFallback>
-                           {loading ? <Skeleton className="h-8 w-8 rounded-full" /> : (user ? user.displayName?.charAt(0)?.toUpperCase() : '')}
+                           {loading || !initial ? <Skeleton className="h-8 w-8 rounded-full" /> : initial}
                         </AvatarFallback>
                     </Avatar>
                     <div className="flex flex-col group-data-[collapsible=icon]:hidden truncate">
