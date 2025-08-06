@@ -50,6 +50,9 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
   const { toast } = useToast();
   const form = useForm<z.infer<typeof uploadSchema>>({
     resolver: zodResolver(uploadSchema),
+    defaultValues: {
+      file: undefined,
+    }
   });
 
   const onSubmit = async (values: z.infer<typeof uploadSchema>) => {
@@ -104,7 +107,7 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
         body: file
       });
       
-      const fileMetadata = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFile.id}?fields=webViewLink`, {
+      const fileMetadata = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFile.id}?fields=webViewLink,thumbnailLink`, {
           headers: new Headers({ 'Authorization': 'Bearer ' + accessToken })
       }).then(res => res.json());
 
@@ -113,8 +116,6 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
       if (!fileUrl) {
         throw new Error("Could not get file URL from Google Drive.");
       }
-
-      const isImage = file.type.startsWith('image/');
 
       // 2. Create a placeholder document in Firestore
       const docRef = await addDoc(collection(db, 'documents'), {
@@ -137,59 +138,45 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
       setIsOpen(false);
       
       // Handle AI processing in the background
-      if (isImage) {
-        toast({
-          title: 'Upload successful!',
-          description: 'Your document is now being processed by the AI.',
-        });
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        const dataUrl = await new Promise<string>((resolve, reject) => {
-          reader.onload = e => resolve(e.target?.result as string);
-          reader.onerror = e => reject(e);
-        });
+      toast({
+        title: 'Upload successful!',
+        description: 'Your document is now being processed by the AI.',
+      });
+
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        reader.onload = e => resolve(e.target?.result as string);
+        reader.onerror = e => reject(e);
+      });
+      
+      try {
+        // These AI flows can handle both image and PDF data URLs
+        const [metadata, textExtraction] = await Promise.all([
+          extractDocumentMetadata({ documentDataUrl: dataUrl }),
+          extractTextFromImage({ documentDataUrl: dataUrl }),
+        ]);
+
+        const { keywords } = await enhanceSearchWithKeywords({ documentText: textExtraction.text });
         
-        try {
-          const [metadata, textExtraction] = await Promise.all([
-            extractDocumentMetadata({ documentDataUrl: dataUrl }),
-            extractTextFromImage({ documentDataUrl: dataUrl }),
-          ]);
+        await updateDoc(doc(db, 'documents', docRef.id), { ...metadata, keywords, summary: metadata.summary, textContent: textExtraction.text, isProcessing: false });
 
-          const { keywords } = await enhanceSearchWithKeywords({ documentText: textExtraction.text });
-          
-          await updateDoc(doc(db, 'documents', docRef.id), { ...metadata, keywords, summary: metadata.summary, textContent: textExtraction.text, isProcessing: false });
-
-          toast({
-            title: 'Processing Complete!',
-            description: `Successfully analyzed and saved your ${metadata.documentType}.`,
-          });
-        } catch (aiError) {
-          console.error('Failed to process document with AI:', aiError);
-          await updateDoc(doc(db, 'documents', docRef.id), {
-            owner: file.name,
-            type: 'Processing Failed',
-            summary: 'Could not analyze this document.',
-            isProcessing: false,
-          });
-          toast({
-            variant: 'destructive',
-            title: 'AI Processing Failed',
-            description: 'Could not extract metadata from the document.',
-          });
-        }
-      } else {
-        // For non-image files like PDFs, just update the placeholder
+        toast({
+          title: 'Processing Complete!',
+          description: `Successfully analyzed and saved your ${metadata.documentType}.`,
+        });
+      } catch (aiError) {
+        console.error('Failed to process document with AI:', aiError);
         await updateDoc(doc(db, 'documents', docRef.id), {
           owner: file.name,
-          type: 'PDF Document',
-          keywords: [file.name.split('.')[0]],
-          summary: 'PDF content analysis is not yet supported.',
-          textContent: 'PDF content analysis is not yet supported.',
+          type: 'Processing Failed',
+          summary: 'Could not analyze this document.',
           isProcessing: false,
         });
         toast({
-          title: 'Upload successful!',
-          description: `${file.name} was saved. PDF analysis is not yet supported.`,
+          variant: 'destructive',
+          title: 'AI Processing Failed',
+          description: 'Could not extract metadata from the document.',
         });
       }
     } catch (error: any) {
