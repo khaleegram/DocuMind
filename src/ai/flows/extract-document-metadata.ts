@@ -44,10 +44,12 @@ const prompt = ai.definePrompt({
   input: {schema: ExtractDocumentMetadataInputSchema},
   output: {schema: ExtractDocumentMetadataOutputSchema},
   prompt: `You are an AI assistant specialized in extracting and normalizing key information from document images.
+  Your primary goal is to accurately identify the document's owner.
+
   Analyze the following document image and extract the required metadata.
 
   **CRITICAL NORMALIZATION RULES:**
-  - **Owner Field:** Identify the primary person's full name. You MUST reformat it to "Firstname Lastname" order and apply Title Case. For example, if the document says "DOE, JOHN" or "john doe", you must return "John Doe". If no person is clearly identified, use the primary company name as the owner, formatted in Title Case.
+  - **Owner Field (Top Priority):** Scrutinize the document for a person's name. It could be labeled as "Name", "To", "For", etc. If a person's name and a company name are both present, the person's name MUST be used as the owner. You MUST reformat the name to "Firstname Lastname" order and apply Title Case. For example, if the document says "DOE, JOHN" or "john doe", you must return "John Doe". If, and only if, no person is clearly identified, use the primary company name as the owner, formatted in Title Case.
   - **Other Text Fields:** For 'company', 'documentType', and 'country', you MUST format them in Title Case (e.g., "Innovate Inc.", "Drivers License", "United States"). This ensures consistency.
   - **Dates:** Find the expiration date and format it as YYYY-MM-DD. If no expiry date is present, use null.
   - **Null Values:** If a field like 'company', 'country', or 'expiryDate' is not present on the document, you MUST return null. Do not guess or invent information.

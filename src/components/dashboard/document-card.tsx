@@ -63,11 +63,15 @@ export function DocumentCard({ document, onDelete }: { document: Document, onDel
   }
 
   const handleCardClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Prevents navigation if a button, link, or interactive element inside the card is clicked.
     if ((e.target as HTMLElement).closest('button, a, [role="menuitem"], [data-collapsible-trigger]')) {
       return;
     }
     router.push(`/dashboard/document/${document.id}`);
   };
+  
+  const keywordsToShow = document.keywords.slice(0, 5);
+  const hiddenKeywordsCount = document.keywords.length - keywordsToShow.length;
 
   return (
     <Card 
@@ -81,7 +85,7 @@ export function DocumentCard({ document, onDelete }: { document: Document, onDel
       </CardHeader>
       <CardContent className="flex-1 p-4">
         <CardTitle className="mb-2 text-lg font-semibold leading-tight truncate">{document.owner}</CardTitle>
-        <div className="space-y-2 text-sm text-muted-foreground">
+        <div className="space-y-2 text-sm text-muted-foreground min-h-[7rem]">
           <div className="flex items-center gap-2">
             <FileText className="h-4 w-4 shrink-0" />
             <span>{document.type}</span>
@@ -104,27 +108,36 @@ export function DocumentCard({ document, onDelete }: { document: Document, onDel
               <span>Expires: {format(parseISO(document.expiry), 'MMM dd, yyyy')}</span>
             </div>
           )}
+
+           <div className="pt-2 flex flex-wrap gap-2">
+                {keywordsToShow.map((keyword, index) => (
+                    <Badge key={`${keyword}-${index}`} variant="secondary">{keyword}</Badge>
+                ))}
+           </div>
         </div>
-        {document.summary && (
-            <Collapsible open={isSummaryOpen} onOpenChange={setIsSummaryOpen} className="mt-4 text-sm">
-                <CollapsibleContent className="space-y-2">
-                     <p className="text-muted-foreground">{document.summary}</p>
-                </CollapsibleContent>
-                <CollapsibleTrigger asChild>
-                    <Button variant="link" className="p-0 h-auto text-xs text-accent" data-collapsible-trigger>
-                        {isSummaryOpen ? 'Read Less' : 'Read More'}
-                        <ChevronDown className={`ml-1 h-3 w-3 transition-transform ${isSummaryOpen ? 'rotate-180' : ''}`} />
-                    </Button>
-                </CollapsibleTrigger>
-            </Collapsible>
-        )}
-        <div className="mt-4 flex flex-wrap gap-2">
-          {document.keywords.map((keyword, index) => (
-            <Badge key={`${keyword}-${index}`} variant="secondary">{keyword}</Badge>
-          ))}
-        </div>
+
+        <Collapsible open={isSummaryOpen} onOpenChange={setIsSummaryOpen} className="mt-2 text-sm">
+            <CollapsibleContent className="space-y-4">
+                 {document.summary && <p className="text-muted-foreground">{document.summary}</p>}
+                 {hiddenKeywordsCount > 0 && (
+                     <div className="flex flex-wrap gap-2">
+                         {document.keywords.slice(5).map((keyword, index) => (
+                             <Badge key={`${keyword}-${index+5}`} variant="secondary">{keyword}</Badge>
+                         ))}
+                     </div>
+                 )}
+            </CollapsibleContent>
+            {(document.summary || hiddenKeywordsCount > 0) && (
+              <CollapsibleTrigger asChild>
+                  <Button variant="link" className="p-0 h-auto text-xs text-accent" data-collapsible-trigger>
+                      {isSummaryOpen ? 'Read Less' : 'Read More'}
+                      <ChevronDown className={`ml-1 h-3 w-3 transition-transform ${isSummaryOpen ? 'rotate-180' : ''}`} />
+                  </Button>
+              </CollapsibleTrigger>
+            )}
+        </Collapsible>
       </CardContent>
-      <CardFooter className="flex justify-between items-center bg-muted/50 p-3">
+      <CardFooter className="flex justify-between items-center bg-muted/50 p-3 mt-auto">
         <Button asChild size="sm" variant="outline" className="text-accent-foreground bg-accent hover:bg-accent/90 border-0">
           <Link href={document.fileUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
             <LinkIcon className="mr-2 h-4 w-4" />
