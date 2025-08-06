@@ -17,6 +17,7 @@ import { googleProvider } from '@/lib/firebase';
 import FilterSidebar from '@/components/dashboard/filter-sidebar';
 import Fuse from 'fuse.js';
 import type { IntelligentSearchOutput } from '@/ai/flows/intelligent-search';
+import { EmptyState } from '@/components/dashboard/empty-state';
 
 export type FilterCategory = 'owner' | 'type' | 'company' | 'country';
 
@@ -127,107 +128,58 @@ export default function AllDocumentsPage() {
         return { ...prev, [category]: newSet };
     });
   }, []);
-  
-  const displayedDocuments = useMemo(() => {
-    // If there are AI search results, show them.
-    if (aiSearchResults !== null) {
-      return aiSearchResults;
-    }
-
-    let filtered = documents;
-    
-    // Apply sidebar filters with fuzzy matching for document values
-    const hasActiveFilters = Object.values(activeFilters).some(s => s.size > 0);
-
-    if (hasActiveFilters) {
-        filtered = filtered.filter(doc => {
-            return Object.entries(activeFilters).every(([category, values]) => {
-                if (values.size === 0) return true;
-                const cat = category as FilterCategory;
-                const docValue = doc[cat];
-                if (!docValue) return false;
-
-                // Check if the doc's value fuzzily matches any of the selected canonical filter values
-                const fuse = new Fuse(Array.from(values), { threshold: 0.2, ignoreLocation: true });
-                return fuse.search(docValue).length > 0;
-            });
-        });
-    }
-
-    // Apply fuzzy search on top of filters
-    if (submittedSearchQuery) {
-        const fuse = new Fuse(filtered, {
-            keys: ['owner', 'company', 'type', 'keywords', 'summary', 'textContent', 'country'],
-            threshold: 0.4, 
-            includeScore: true,
-        });
-        filtered = fuse.search(submittedSearchQuery).map(result => result.item);
-    }
-
-    return filtered;
-  }, [documents, submittedSearchQuery, activeFilters, aiSearchResults]);
-
-  const handleSearchSubmit = () => {
-    setAiSearchResults(null); // Clear AI results on manual search
-    setSubmittedSearchQuery(searchQuery);
-  };
 
   const clearFilters = useCallback(() => {
     setActiveFilters({ owner: new Set(), type: new Set(), company: new Set(), country: new Set() });
     setAiSearchResults(null);
+    setSearchQuery('');
+    setSubmittedSearchQuery('');
   }, []);
-
+  
   const handleAiSearch = useCallback((criteria: IntelligentSearchOutput) => {
     const { owner, documentType, country, keywords } = criteria;
-    const searchConfig: any[] = [];
     
-    // Create a query for Fuse.js's extended search ($and, $or)
-    // This allows for more complex, targeted searches.
-    const andQuery: any = { $and: [] };
+    let potentialMatches = documents;
 
-    if (owner) {
-        andQuery.$and.push({ owner: owner });
+    // Step 1: Filter by specific, high-confidence fields first (if available)
+    if (owner || documentType || country) {
+        const fuseFilter = new Fuse(potentialMatches, { threshold: 0.3, keys: ['owner', 'type', 'country'] });
+        
+        let filteredByEntities: DocumentType[] = potentialMatches;
+        
+        if (owner) {
+             filteredByEntities = fuseFilter.search(owner).map(r => r.item).filter(d => d.owner && new Fuse([d.owner]).search(owner).length > 0);
+        }
+        if (documentType) {
+            filteredByEntities = filteredByEntities.filter(d => d.type && new Fuse([d.type]).search(documentType).length > 0);
+        }
+        if (country) {
+            filteredByEntities = filteredByEntities.filter(d => d.country && new Fuse([d.country]).search(country).length > 0);
+        }
+        potentialMatches = filteredByEntities;
     }
-    if (documentType) {
-        andQuery.$and.push({ type: documentType });
-    }
-    if (country) {
-        andQuery.$and.push({ country: country });
-    }
-
-    // If there are keywords, search them across multiple fields
+    
+    // Step 2: Use remaining keywords to perform a broader fuzzy search on the narrowed-down list
+    let finalResults = potentialMatches;
     if (keywords && keywords.length > 0) {
         const keywordQuery = keywords.join(' ');
-        andQuery.$and.push({
-            $or: [
-                { summary: keywordQuery },
-                { textContent: keywordQuery },
-                { keywords: keywordQuery },
-                { company: keywordQuery },
-            ]
+        const fuseSearch = new Fuse(potentialMatches, {
+            keys: ['summary', 'textContent', 'keywords', 'company', 'owner', 'type'],
+            threshold: 0.4,
+            includeScore: true,
         });
+        finalResults = fuseSearch.search(keywordQuery).map(result => result.item);
     }
-
-    const fuse = new Fuse(documents, {
-        keys: ['owner', 'company', 'type', 'keywords', 'summary', 'textContent', 'country'],
-        threshold: 0.4, // Adjust threshold for desired fuzziness
-        includeScore: true,
-        useExtendedSearch: true,
-    });
     
-    // If there's something to search for, perform the search
-    const results = andQuery.$and.length > 0 
-        ? fuse.search(andQuery).map(result => result.item)
-        : [];
-    
-    setAiSearchResults(results);
+    setAiSearchResults(finalResults);
 
     // Clear manual filters and search to avoid confusion
-    clearFilters();
+    setActiveFilters({ owner: new Set(), type: new Set(), company: new Set(), country: new Set() });
     setSearchQuery('');
     setSubmittedSearchQuery('');
 
-  }, [documents, clearFilters]);
+  }, [documents]);
+
 
  const handleDeleteDocument = async (docId: string) => {
     if (!user) return;
@@ -289,7 +241,51 @@ export default function AllDocumentsPage() {
         });
     }
   };
+
+  const handleSearchSubmit = () => {
+    setAiSearchResults(null); // Clear AI results on manual search
+    setSubmittedSearchQuery(searchQuery);
+  };
   
+  const displayedDocuments = useMemo(() => {
+    // If there are AI search results, show them.
+    if (aiSearchResults !== null) {
+      return aiSearchResults;
+    }
+
+    let filtered = documents;
+    
+    // Apply sidebar filters with fuzzy matching for document values
+    const hasActiveFilters = Object.values(activeFilters).some(s => s.size > 0);
+
+    if (hasActiveFilters) {
+        filtered = filtered.filter(doc => {
+            return Object.entries(activeFilters).every(([category, values]) => {
+                if (values.size === 0) return true;
+                const cat = category as FilterCategory;
+                const docValue = doc[cat];
+                if (!docValue) return false;
+
+                // Check if the doc's value fuzzily matches any of the selected canonical filter values
+                const fuse = new Fuse(Array.from(values), { threshold: 0.2, ignoreLocation: true });
+                return fuse.search(docValue).length > 0;
+            });
+        });
+    }
+
+    // Apply fuzzy search on top of filters
+    if (submittedSearchQuery) {
+        const fuse = new Fuse(filtered, {
+            keys: ['owner', 'company', 'type', 'keywords', 'summary', 'textContent', 'country'],
+            threshold: 0.4, 
+            includeScore: true,
+        });
+        filtered = fuse.search(submittedSearchQuery).map(result => result.item);
+    }
+
+    return filtered;
+  }, [documents, submittedSearchQuery, activeFilters, aiSearchResults]);
+
 
   if (loading || (!user && !loading)) {
     return (
@@ -324,7 +320,9 @@ export default function AllDocumentsPage() {
               <Loader2 className="h-16 w-16 animate-spin text-primary" />
             </div>
           ) : (
-            <DocumentList documents={displayedDocuments} onDelete={handleDeleteDocument} />
+             displayedDocuments.length === 0 && (submittedSearchQuery || aiSearchResults !== null) 
+             ? <EmptyState /> 
+             : <DocumentList documents={displayedDocuments} onDelete={handleDeleteDocument} />
           )}
         </main>
       </div>
