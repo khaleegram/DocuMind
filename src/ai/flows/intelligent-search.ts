@@ -11,12 +11,12 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 
-export const IntelligentSearchInputSchema = z.object({
+const IntelligentSearchInputSchema = z.object({
   query: z.string().describe('The user\'s natural language search query.'),
 });
 export type IntelligentSearchInput = z.infer<typeof IntelligentSearchInputSchema>;
 
-export const IntelligentSearchOutputSchema = z.object({
+const IntelligentSearchOutputSchema = z.object({
   owner: z.string().nullable().describe('The identified owner (person or company) to filter by, if any.'),
   documentType: z.string().nullable().describe('The identified document type to filter by, if any.'),
   country: z.string().nullable().describe('The identified country to filter by, if any.'),
