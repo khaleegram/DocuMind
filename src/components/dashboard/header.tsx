@@ -46,7 +46,7 @@ function AiSearchAgent({ onAiSearch, isSearching, initialQuery }: { onAiSearch: 
     }, [initialQuery]);
     
     return (
-        <form onSubmit={handleSearch} className="relative flex-1 ml-auto sm:flex-grow-0">
+        <form onSubmit={handleSearch} className="relative w-full sm:w-auto">
             <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-accent" />
             <Input 
                 placeholder="AI Search: e.g., 'Danish visa for John Doe'"
@@ -125,6 +125,7 @@ export default function Header({
     showSearch = true,
     showAiSearch = false
 }: HeaderProps) {
+  const [isMobileSearchFocused, setIsMobileSearchFocused] = useState(false);
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       onSearchSubmit?.();
@@ -138,12 +139,17 @@ export default function Header({
 
   return (
     <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-4 border-b bg-background/95 px-4 backdrop-blur-sm sm:px-6">
-      <div className="flex w-full items-center gap-4">
-        <h1 className="flex-1 shrink-0 text-xl font-semibold md:text-2xl whitespace-nowrap">{title}</h1>
-        <div className="ml-auto flex items-center gap-2">
-            {showAiSearch && onAiSearch && <AiSearchAgent onAiSearch={onAiSearch} isSearching={isAiSearching} initialQuery={searchQuery} />}
+      <div className="flex w-full items-center gap-2 sm:gap-4">
+        <h1 className={`text-xl font-semibold md:text-2xl whitespace-nowrap ${isMobileSearchFocused ? 'hidden sm:block' : 'block'}`}>{title}</h1>
+        
+        <div className={`flex flex-1 items-center gap-2 justify-end ${isMobileSearchFocused ? 'w-full' : 'w-auto'}`}>
+            {showAiSearch && onAiSearch && 
+                <div className={`w-full sm:w-auto ${!isMobileSearchFocused && 'hidden sm:block'}`}>
+                    <AiSearchAgent onAiSearch={onAiSearch} isSearching={isAiSearching} initialQuery={searchQuery} />
+                </div>
+            }
             {showSearch && onSearchSubmit && setSearchQuery && (
-                 <form onSubmit={handleFormSubmit} className="relative flex-1 ml-auto sm:flex-grow-0">
+                 <form onSubmit={handleFormSubmit} className={`relative w-full sm:w-auto ${!isMobileSearchFocused && 'hidden sm:block'}`}>
                     <Input
                         type="search"
                         placeholder="Search keywords..."
@@ -152,6 +158,8 @@ export default function Header({
                         onChange={(e) => setSearchQuery(e.target.value)}
                         onKeyDown={handleSearchKeyDown}
                         aria-label="Search"
+                        onFocus={() => setIsMobileSearchFocused(true)}
+                        onBlur={() => setIsMobileSearchFocused(false)}
                     />
                     <Button 
                         type="submit" 
@@ -164,11 +172,26 @@ export default function Header({
                     </Button>
                 </form>
             )}
-            <Button onClick={onUploadClick} className="bg-accent hover:bg-accent/90 h-10">
-              <Upload className="mr-0 sm:mr-2 h-4 w-4" /> 
-              <span className="hidden sm:inline">Upload</span>
-            </Button>
-            <UserProfile />
+
+            {(showAiSearch || showSearch) && (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="sm:hidden"
+                onClick={() => setIsMobileSearchFocused(true)}
+              >
+                  <Search className="h-5 w-5" />
+                  <span className="sr-only">Open Search</span>
+              </Button>
+            )}
+            
+            <div className={`${isMobileSearchFocused ? 'hidden sm:flex' : 'flex'} items-center gap-2`}>
+                <Button onClick={onUploadClick} className="bg-accent hover:bg-accent/90 h-10">
+                <Upload className="mr-0 sm:mr-2 h-4 w-4" /> 
+                <span className="hidden sm:inline">Upload</span>
+                </Button>
+                <UserProfile />
+            </div>
         </div>
       </div>
     </header>
