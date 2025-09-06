@@ -1,7 +1,7 @@
 {
   "name": "nextn",
   "version": "0.1.0",
-  "private": true,
+  "private": "true",
   "scripts": {
     "dev": "next dev --turbopack -p 9002",
     "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
@@ -42,6 +42,7 @@
     "dotenv": "^16.5.0",
     "embla-carousel-react": "^8.6.0",
     "firebase": "^10.12.2",
+    "framer-motion": "^11.5.7",
     "fuse.js": "^7.0.0",
     "genkit": "^1.14.1",
     "lucide-react": "^0.475.0",

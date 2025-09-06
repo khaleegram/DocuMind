@@ -204,7 +204,7 @@ const Sidebar = React.forwardRef<
           <SheetContent
             data-sidebar="sidebar"
             data-mobile="true"
-            className="w-[--sidebar-width-mobile] bg-card p-0 text-card-foreground [&>button]:hidden"
+            className="w-[--sidebar-width-mobile] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
             side={side}
           >
             <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
@@ -228,7 +228,7 @@ const Sidebar = React.forwardRef<
       >
         <div
           data-sidebar="sidebar"
-          className="flex h-full w-full flex-col border-r bg-card"
+          className="flex h-full w-full flex-col border-r bg-sidebar"
         >
           {children}
         </div>
