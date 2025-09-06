@@ -15,14 +15,12 @@ export type Document = {
   textContent: string;
   mimeType: string;
   thumbnailUrl: string | null;
-  driveFileId: string;
-  folderId?: string; // Link to the folder
+  storagePath: string; // Firebase Storage path
 };
 
 export type Folder = {
     id: string;
     userId: string;
     name: string; // The person or organization name
-    driveFolderId: string;
     createdAt: string;
 }

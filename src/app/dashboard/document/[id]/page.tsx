@@ -7,7 +7,7 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import type { Document as DocumentType } from '@/lib/types';
-import { Loader2, ArrowLeft, Send, User, Bot, Sparkles, PanelLeft } from 'lucide-react';
+import { Loader2, ArrowLeft, Send, User, Bot, Sparkles, PanelLeft, FileWarning, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -17,6 +17,7 @@ import { chatWithDocument } from '@/ai/flows/chat-with-document';
 import { generateSuggestedQuestions } from '@/ai/flows/generate-suggested-questions';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 type Message = {
   sender: 'user' | 'ai';
@@ -156,6 +157,29 @@ export default function DocumentChatPage() {
     );
   }
   
+  const DocumentViewer = () => {
+     if (document.mimeType === 'application/pdf') {
+      return (
+        <div className="w-full h-full p-8 flex flex-col items-center justify-center bg-muted">
+            <Alert>
+                <FileWarning className="h-4 w-4" />
+                <AlertTitle>PDF Preview Not Available</AlertTitle>
+                <AlertDescription>
+                    Directly viewing PDFs is not supported for security reasons. You can view the document by opening it in a new tab.
+                </AlertDescription>
+            </Alert>
+             <Button asChild className="mt-4">
+                <a href={document.fileUrl} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="mr-2" />
+                  Open PDF in New Tab
+                </a>
+            </Button>
+        </div>
+      )
+    }
+    return <iframe src={document.fileUrl} className="w-full h-full border-0" title={document.fileName} />
+  }
+
   const ChatPanel = () => (
      <Card className="flex-1 flex flex-col border-0 rounded-none h-full">
         <CardHeader>
@@ -254,7 +278,7 @@ export default function DocumentChatPage() {
                         </SheetHeader>
                         <div className="flex-1 overflow-y-auto">
                              <div className="h-[50vh]">
-                                <iframe src={document.fileUrl} className="w-full h-full border-0" title={document.fileName} />
+                                <DocumentViewer />
                             </div>
                             <div className="h-[50vh]">
                                <ChatPanel />
@@ -268,8 +292,8 @@ export default function DocumentChatPage() {
 
       <main className="flex-1 overflow-hidden">
         <div className="h-full hidden md:flex">
-          <div className="w-1/2 h-full overflow-y-auto border-r p-4">
-             <iframe src={document.fileUrl} className="w-full h-full border-0" title={document.fileName} />
+          <div className="w-1/2 h-full overflow-y-auto border-r p-4 bg-muted">
+             <DocumentViewer />
           </div>
           <div className="w-1/2 h-full flex flex-col">
             <ChatPanel />
@@ -290,5 +314,3 @@ function AvatarIcon({ children }: { children: React.ReactNode }) {
         </div>
     );
 }
-
-    

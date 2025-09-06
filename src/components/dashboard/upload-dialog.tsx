@@ -22,10 +22,10 @@ import { Loader2, FileUp } from 'lucide-react';
 import { extractDocumentMetadata } from '@/ai/flows/extract-document-metadata';
 import { enhanceSearchWithKeywords } from '@/ai/flows/enhance-search-with-keywords';
 import { extractTextFromImage } from '@/ai/flows/extract-text-from-image';
-import { auth, db, googleProvider } from '@/lib/firebase';
+import { auth, db, storage } from '@/lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { v4 as uuidv4 } from 'uuid';
-import { doc, addDoc, collection, serverTimestamp, updateDoc, query, where, getDocs, setDoc } from 'firebase/firestore';
-import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { doc, addDoc, collection, serverTimestamp, updateDoc } from 'firebase/firestore';
 
 
 const uploadSchema = z.object({
@@ -63,82 +63,6 @@ const retryWithBackoff = async <T,>(
   }
 };
 
-const getOrCreateFolder = async (accessToken: string, folderName: string, parentFolderId: string) => {
-    const foldersRef = collection(db, 'folders');
-    const user = auth.currentUser;
-
-    const q = query(foldersRef, where('userId', '==', user!.uid), where('name', '==', folderName));
-    const querySnapshot = await getDocs(q);
-
-    if (!querySnapshot.empty) {
-        const folderDoc = querySnapshot.docs[0];
-        return { id: folderDoc.id, driveFolderId: folderDoc.data().driveFolderId };
-    }
-
-    // If folder doesn't exist in Firestore, create it in Google Drive
-    const driveMetadataResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
-        method: 'POST',
-        headers: new Headers({ 
-          'Authorization': 'Bearer ' + accessToken,
-          'Content-Type': 'application/json',
-        }),
-        body: JSON.stringify({
-          name: folderName,
-          mimeType: 'application/vnd.google-apps.folder',
-          parents: [parentFolderId]
-        })
-      });
-    
-    if (!driveMetadataResponse.ok) {
-        const errorBody = await driveMetadataResponse.json().catch(() => ({ error: { message: `Could not create folder "${folderName}" in Google Drive.` }}));
-        throw new Error(errorBody.error.message);
-    }
-    const driveFolder = await driveMetadataResponse.json();
-
-    // Create a new folder document in Firestore
-    const newFolderRef = doc(foldersRef);
-    await setDoc(newFolderRef, {
-        userId: user!.uid,
-        name: folderName,
-        driveFolderId: driveFolder.id,
-        createdAt: serverTimestamp(),
-    });
-
-    return { id: newFolderRef.id, driveFolderId: driveFolder.id };
-}
-
-const getDocuMindFolderId = async (accessToken: string) => {
-    // Check if DocuMind folder exists
-    const driveQuery = "mimeType='application/vnd.google-apps.folder' and name='DocuMind' and trashed=false";
-    const driveSearchResponse = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(driveQuery)}&fields=files(id,name)`, {
-        headers: new Headers({ 'Authorization': 'Bearer ' + accessToken })
-    });
-
-    if (!driveSearchResponse.ok) throw new Error("Could not search for DocuMind folder.");
-    const searchResult = await driveSearchResponse.json();
-
-    if (searchResult.files.length > 0) {
-        return searchResult.files[0].id;
-    }
-
-    // Create DocuMind folder if it doesn't exist
-    const driveMetadataResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
-        method: 'POST',
-        headers: new Headers({ 
-          'Authorization': 'Bearer ' + accessToken,
-          'Content-Type': 'application/json',
-        }),
-        body: JSON.stringify({
-          name: 'DocuMind',
-          mimeType: 'application/vnd.google-apps.folder',
-        })
-      });
-    
-    if (!driveMetadataResponse.ok) throw new Error("Could not create the main 'DocuMind' folder in Google Drive.");
-    const driveFolder = await driveMetadataResponse.json();
-    return driveFolder.id;
-}
-
 
 export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -151,71 +75,26 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
     }
   });
 
-  const processFile = async (file: File, accessToken: string, user: any) => {
+  const processFile = async (file: File, user: any) => {
       const uniqueFileName = `${uuidv4()}-${file.name}`;
-      
-      const docuMindFolderId = await getDocuMindFolderId(accessToken);
-      
+      const storagePath = `documents/${user.uid}/${uniqueFileName}`;
+      const storageRef = ref(storage, storagePath);
+
       const readerForMetadata = new FileReader();
       readerForMetadata.readAsDataURL(file);
       const dataUrlForMetadata = await new Promise<string>((resolve, reject) => {
         readerForMetadata.onload = e => resolve(e.target?.result as string);
         readerForMetadata.onerror = e => reject(e);
       });
-      const tempMetadata = await retryWithBackoff(() => extractDocumentMetadata({ documentDataUrl: dataUrlForMetadata }));
-      const folderName = tempMetadata.company || tempMetadata.owner;
       
-      const targetFolder = await getOrCreateFolder(accessToken, folderName, docuMindFolderId);
-      
-      const driveMetadataResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-        method: 'POST',
-        headers: new Headers({ 
-          'Authorization': 'Bearer ' + accessToken,
-          'Content-Type': 'application/json',
-        }),
-        body: JSON.stringify({
-          name: uniqueFileName,
-          mimeType: file.type,
-          parents: [targetFolder.driveFolderId]
-        })
-      });
-
-      if (!driveMetadataResponse.ok) {
-        const errorBody = await driveMetadataResponse.json().catch(() => ({ error: { message: "Unknown error during Drive metadata creation." }}));
-        throw new Error(errorBody.error.message);
-      }
-      const driveFile = await driveMetadataResponse.json();
-      
-      const mediaUploadResponse = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFile.id}?uploadType=media`, {
-        method: 'PATCH',
-        headers: new Headers({
-            'Authorization': 'Bearer ' + accessToken,
-            'Content-Type': file.type,
-        }),
-        body: file
-      });
-      if (!mediaUploadResponse.ok) {
-         const errorBody = await mediaUploadResponse.json().catch(() => ({ error: { message: "Unknown error during Drive media upload." }}));
-         throw new Error(errorBody.error.message);
-      }
-
-      const fileMetadata = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFile.id}?fields=webViewLink,thumbnailLink`, {
-          headers: new Headers({ 'Authorization': 'Bearer ' + accessToken })
-      }).then(res => res.json());
-
-      const fileUrl = fileMetadata.webViewLink;
-      const thumbnailUrl = fileMetadata.thumbnailLink || null;
-      if (!fileUrl) throw new Error("Could not get file URL from Google Drive.");
-
       const docRef = await addDoc(collection(db, 'documents'), {
         userId: user.uid,
-        fileName: uniqueFileName,
-        fileUrl: fileUrl,
-        thumbnailUrl: thumbnailUrl,
+        fileName: file.name,
+        storagePath: storagePath,
+        fileUrl: '', // Will be updated after upload
+        thumbnailUrl: null, // Thumbnails are not generated by default in Firebase Storage
         mimeType: file.type,
         uploadedAt: serverTimestamp(),
-        driveFileId: driveFile.id,
-        folderId: targetFolder.id,
         owner: 'Processing...',
         type: 'Processing...',
         keywords: [],
@@ -227,18 +106,35 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
         isProcessing: true,
       });
 
-      toast({ title: `Uploading ${file.name}`, description: 'Your document is now being organized by the AI.' });
+      toast({ title: `Uploading ${file.name}`, description: 'Please wait while we upload and process your file.' });
+      
+      // Upload file to Firebase Storage
+      const uploadTask = await uploadBytes(storageRef, file);
+      const fileUrl = await getDownloadURL(uploadTask.ref);
 
+      await updateDoc(doc(db, 'documents', docRef.id), { fileUrl });
+      
       try {
-        const [textExtraction] = await Promise.all([
-          retryWithBackoff(() => extractTextFromImage({ documentDataUrl: dataUrlForMetadata })),
-        ]);
-        const { keywords } = await retryWithBackoff(() => enhanceSearchWithKeywords({ documentText: textExtraction.text }));
-        await updateDoc(doc(db, 'documents', docRef.id), { ...tempMetadata, keywords, summary: tempMetadata.summary, textContent: textExtraction.text, isProcessing: false });
-        toast({ title: `Processing Complete for ${file.name}!`, description: `Successfully analyzed and saved your ${tempMetadata.documentType}.` });
+        const metadata = await retryWithBackoff(() => extractDocumentMetadata({ documentDataUrl: dataUrlForMetadata }));
+        const { text } = await retryWithBackoff(() => extractTextFromImage({ documentDataUrl: dataUrlForMetadata }));
+        const { keywords } = await retryWithBackoff(() => enhanceSearchWithKeywords({ documentText: text }));
+        
+        await updateDoc(doc(db, 'documents', docRef.id), {
+          ...metadata,
+          keywords,
+          textContent: text,
+          isProcessing: false,
+        });
+
+        toast({ title: `Processing Complete for ${file.name}!`, description: `Successfully analyzed and saved your ${metadata.documentType}.` });
       } catch (aiError) {
         console.error(`Failed to process ${file.name} with AI:`, aiError);
-        await updateDoc(doc(db, 'documents', docRef.id), { owner: file.name, type: 'Processing Failed', summary: 'Could not analyze this document.', isProcessing: false });
+        await updateDoc(doc(db, 'documents', docRef.id), { 
+            owner: file.name, 
+            type: 'Processing Failed', 
+            summary: 'Could not analyze this document.', 
+            isProcessing: false 
+        });
         toast({ variant: 'destructive', title: 'AI Processing Failed', description: `Could not extract metadata from ${file.name}.` });
       }
   };
@@ -256,42 +152,21 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
     const files = Array.from(values.files) as File[];
 
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const credential = GoogleAuthProvider.credentialFromResult(result);
-      if (!credential || !credential.accessToken) {
-        throw new Error("Could not retrieve a valid access token. Please sign in again.");
-      }
-      const accessToken = credential.accessToken;
-      
       setIsOpen(false);
       form.reset();
       setFileNames([]);
 
       toast({
-          title: `Starting upload of ${files.length} documents...`,
-          description: 'You can continue to use the app while processing happens.',
+          title: `Starting upload of ${files.length} document(s)...`,
+          description: 'You can continue to use the app while processing happens in the background.',
       });
 
-      for (const file of files) {
-          try {
-              await processFile(file, accessToken, user);
-          } catch(fileError: any) {
-               console.error(`Failed to upload file ${file.name}:`, fileError);
-               toast({ variant: 'destructive', title: `Upload Failed for ${file.name}`, description: fileError.message || 'Could not upload this document.' });
-          }
-      }
+      // Process all files
+      await Promise.all(files.map(file => processFile(file, user)));
 
     } catch (error: any) {
-      console.error('Failed to upload document:', error);
-      let description = 'Could not upload the document. Please try again.';
-      if (error.code === 'auth/popup-closed-by-user') {
-        description = 'The authentication popup was closed. Please try uploading again.';
-      } else if (error.code === 'auth/cancelled-popup-request' || error.code === 'auth/popup-blocked') {
-        description = 'The authentication popup was blocked or cancelled. Please allow popups for this site and try again.';
-      } else if (error.message) {
-        description = error.message;
-      }
-      toast({ variant: 'destructive', title: 'Upload Failed', description: description });
+      console.error('Failed to upload documents:', error);
+      toast({ variant: 'destructive', title: 'Upload Failed', description: error.message || 'An unexpected error occurred.' });
     } finally {
       setIsProcessing(false);
     }

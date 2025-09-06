@@ -6,14 +6,13 @@ import type { Document as DocumentType } from '@/lib/types';
 import Header from '@/components/dashboard/header';
 import DocumentList from '@/components/dashboard/document-list';
 import { UploadDialog } from '@/components/dashboard/upload-dialog';
-import { auth, db } from '@/lib/firebase';
+import { auth, db, storage } from '@/lib/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { useRouter } from 'next/navigation';
 import { collection, query, where, onSnapshot, deleteDoc, doc, getDoc } from 'firebase/firestore';
+import { ref, deleteObject } from 'firebase/storage';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
-import { googleProvider } from '@/lib/firebase';
 import FilterSidebar from '@/components/dashboard/filter-sidebar';
 import Fuse from 'fuse.js';
 import { EmptyState } from '@/components/dashboard/empty-state';
@@ -177,8 +176,9 @@ export default function AllDocumentsPage() {
   }, [documents, toast, clearFilters]);
 
 
- const handleDeleteDocument = async (docId: string) => {
+  const handleDeleteDocument = async (docId: string) => {
     if (!user) return;
+
     try {
       const docRef = doc(db, 'documents', docId);
       const docSnap = await getDoc(docRef);
@@ -186,41 +186,21 @@ export default function AllDocumentsPage() {
       if (!docSnap.exists()) {
         throw new Error("Document not found in the database.");
       }
-      const docToDelete = { id: docSnap.id, ...docSnap.data() } as DocumentType;
+      const docToDelete = docSnap.data() as DocumentType;
 
-      if (!docToDelete.driveFileId) {
-          await deleteDoc(docRef);
-          toast({
-            title: 'Document Record Deleted',
-            description: `Removed ${docToDelete.fileName} from your list.`,
-          });
-        return;
-      }
-      
-      const result = await signInWithPopup(auth, googleProvider);
-      const credential = GoogleAuthProvider.credentialFromResult(result);
-      if (!credential || !credential.accessToken) {
-        throw new Error("Could not get valid credentials to delete file.");
-      }
-      const accessToken = credential.accessToken;
-
-      const driveResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${docToDelete.driveFileId}?supportsAllDrives=true`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': 'Bearer ' + accessToken
-        }
-      });
-
-      if (!driveResponse.ok) {
-        if (driveResponse.status === 404) {
-             console.warn('File not found on Google Drive during deletion, but proceeding as it might be orphaned.');
-        } else {
-            const errorData = await driveResponse.json().catch(() => ({error: {message: "Could not parse error from Google Drive."}}));
-            console.error('Google Drive deletion error:', errorData);
-            throw new Error(errorData.error.message || 'Failed to delete file from Google Drive.');
-        }
+      // Delete from Firebase Storage
+      if (docToDelete.storagePath) {
+        const fileRef = ref(storage, docToDelete.storagePath);
+        await deleteObject(fileRef).catch((error) => {
+            // It's okay if the file doesn't exist in storage, we can still delete the record
+            if (error.code !== 'storage/object-not-found') {
+                throw error;
+            }
+            console.warn(`File not found in Storage at path: ${docToDelete.storagePath}, but proceeding with Firestore deletion.`);
+        });
       }
 
+      // Delete from Firestore
       await deleteDoc(docRef);
 
       toast({
@@ -229,14 +209,15 @@ export default function AllDocumentsPage() {
       });
       
     } catch (error: any) {
-        console.error("Error deleting document: ", error);
-        toast({
-            variant: 'destructive',
-            title: 'Deletion Failed',
-            description: error.message || 'Could not delete the document.',
-        });
+      console.error("Error deleting document: ", error);
+      toast({
+        variant: 'destructive',
+        title: 'Deletion Failed',
+        description: error.message || 'Could not delete the document.',
+      });
     }
   };
+
 
   const handleSearchSubmit = () => {
     setAiSearchResults(null); // Clear AI results on manual search
@@ -334,4 +315,3 @@ export default function AllDocumentsPage() {
     </div>
   );
 }
-

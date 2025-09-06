@@ -18,10 +18,12 @@ export function DocumentCard({ document, onDelete }: { document: Document, onDel
   const router = useRouter();
 
   const renderFilePreview = () => {
-    if (document.mimeType?.startsWith('image/') && document.thumbnailUrl) {
+    // Firebase Storage doesn't provide thumbnails for PDFs, so we show a generic icon.
+    // For images, we would ideally use a thumbnail URL if we generated one.
+    if (document.mimeType?.startsWith('image/') && document.fileUrl) {
       return (
          <Image 
-            src={document.thumbnailUrl} 
+            src={document.fileUrl} // Using full URL, could be optimized with thumbnails
             alt={`Preview of ${document.fileName}`}
             width={200}
             height={150}
@@ -139,10 +141,10 @@ export function DocumentCard({ document, onDelete }: { document: Document, onDel
       </CardContent>
       <CardFooter className="flex justify-between items-center bg-muted/50 p-3 mt-auto">
         <Button asChild size="sm" variant="outline" className="text-accent-foreground bg-accent hover:bg-accent/90 border-0">
-          <Link href={document.fileUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+          <a href={document.fileUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
             <LinkIcon className="mr-2 h-4 w-4" />
             View
-          </Link>
+          </a>
         </Button>
          <Button asChild size="sm" variant="outline" >
           <Link href={`/dashboard/document/${document.id}`} onClick={(e) => e.stopPropagation()}>
