@@ -3,11 +3,25 @@
 
 import { createUploadthing, type FileRouter } from 'uploadthing/next';
 import { UploadThingError } from 'uploadthing/server';
-import { auth } from '@/lib/firebase-admin';
-import { db } from '@/lib/firebase-admin';
+import * as admin from 'firebase-admin';
 import { enhanceSearchWithKeywords } from '@/ai/flows/enhance-search-with-keywords';
 import { extractDocumentMetadata } from '@/ai/flows/extract-document-metadata';
 import { extractTextFromImage } from '@/ai/flows/extract-text-from-image';
+
+// Initialize Firebase Admin SDK directly in the API route
+const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY
+  ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)
+  : undefined;
+
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
+}
+
+const auth = admin.auth();
+const db = admin.firestore();
+
 
 const f = createUploadthing();
 
