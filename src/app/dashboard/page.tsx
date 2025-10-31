@@ -14,7 +14,7 @@ import { DocumentTypeChart, getChartData } from '@/components/dashboard/document
 import ExpiringSoonList from '@/components/dashboard/expiring-soon-list';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { subDays, isAfter, isBefore, addDays } from 'date-fns';
+import { subDays, isAfter, isBefore, addDays, isValid } from 'date-fns';
 
 export default function DashboardHomePage() {
   const [user, loadingAuth] = useAuthState(auth);
@@ -58,6 +58,8 @@ export default function DashboardHomePage() {
         if (!doc.expiry) return false;
         try {
           const expiryDate = new Date(doc.expiry);
+          // Check if the parsed date is valid before comparing
+          if (!isValid(expiryDate)) return false;
           return isAfter(expiryDate, today) && isBefore(expiryDate, ninetyDaysFromNow);
         } catch {
           return false;
