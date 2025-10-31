@@ -1,9 +1,10 @@
+
 'use server';
 
 import { createUploadthing, type FileRouter } from 'uploadthing/next';
 import { UploadThingError } from 'uploadthing/server';
-import { auth } from '@/lib/firebase-admin';
-import { db } from '@/lib/firebase-admin';
+import { auth } from '../../../lib/firebase-admin';
+import { db } from '../../../lib/firebase-admin';
 import { enhanceSearchWithKeywords } from '@/ai/flows/enhance-search-with-keywords';
 import { extractDocumentMetadata } from '@/ai/flows/extract-document-metadata';
 import { extractTextFromImage } from '@/ai/flows/extract-text-from-image';
