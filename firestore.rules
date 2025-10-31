@@ -3,11 +3,12 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users can only read and write their own documents.
-    // The `request.auth.uid` variable contains the user's ID.
-    // The `resource.data.userId` field is the ID of the user who owns the document.
-    match /documents/{documentId} {
-      allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
+    match /documents/{docId} {
+      // Allow users to create documents if the document's userId matches their own.
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      
+      // Allow users to read, update, or delete their own documents.
+      allow read, update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
   }
 }
