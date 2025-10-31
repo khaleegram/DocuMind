@@ -24,11 +24,11 @@
     --input: 220 13% 89%;
     --ring: 45 93% 58%;
     --radius: 0.5rem;
-    --chart-1: 45 93% 58%; /* yellow */
-    --chart-2: 142 71% 45%; /* green */
-    --chart-3: 0 63% 50%; /* red */
-    --chart-4: 210 40% 50%; /* blue */
-    --chart-5: 262 88% 66%; /* purple for fallback */
+    --chart-1: hsl(45 93% 58%); /* yellow */
+    --chart-2: hsl(142 71% 45%); /* green */
+    --chart-3: hsl(0 63% 50%); /* red */
+    --chart-4: hsl(210 40% 50%); /* blue */
+    --chart-5: hsl(262 88% 66%); /* purple for fallback */
   }
 
   .dark {
@@ -51,11 +51,11 @@
     --border: 0 0% 15%;
     --input: 0 0% 15%;
     --ring: 45 93% 58%;
-    --chart-1: 45 93% 58%; /* yellow */
-    --chart-2: 142 71% 45%; /* green */
-    --chart-3: 0 63% 50%; /* red */
-    --chart-4: 210 40% 50%; /* blue */
-    --chart-5: 262 88% 66%; /* purple for fallback */
+    --chart-1: hsl(45 93% 58%); /* yellow */
+    --chart-2: hsl(142 71% 45%); /* green */
+    --chart-3: hsl(0 63% 50%); /* red */
+    --chart-4: hsl(210 40% 50%); /* blue */
+    --chart-5: hsl(262 88% 66%); /* purple for fallback */
   }
 }
 
