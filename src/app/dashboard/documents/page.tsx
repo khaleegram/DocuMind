@@ -10,7 +10,6 @@ import { auth, db, storage } from '@/lib/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { useRouter } from 'next/navigation';
 import { collection, query, where, onSnapshot, deleteDoc, doc, getDoc } from 'firebase/firestore';
-import { ref, deleteObject } from 'firebase/storage';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import FilterSidebar from '@/components/dashboard/filter-sidebar';
@@ -180,41 +179,40 @@ export default function AllDocumentsPage() {
     if (!user) return;
 
     try {
-      const docRef = doc(db, 'documents', docId);
-      const docSnap = await getDoc(docRef);
+        const docRef = doc(db, 'documents', docId);
+        const docSnap = await getDoc(docRef);
 
-      if (!docSnap.exists()) {
-        throw new Error("Document not found in the database.");
-      }
-      const docToDelete = docSnap.data() as DocumentType;
+        if (!docSnap.exists()) {
+            throw new Error("Document not found in the database.");
+        }
+        const docToDelete = docSnap.data() as DocumentType;
 
-      // Delete from Firebase Storage
-      if (docToDelete.storagePath) {
-        const fileRef = ref(storage, docToDelete.storagePath);
-        await deleteObject(fileRef).catch((error) => {
-            // It's okay if the file doesn't exist in storage, we can still delete the record
-            if (error.code !== 'storage/object-not-found') {
-                throw error;
-            }
-            console.warn(`File not found in Storage at path: ${docToDelete.storagePath}, but proceeding with Firestore deletion.`);
+        // Delete from UploadThing
+        if (docToDelete.storagePath) {
+            await fetch('/api/uploadthing/delete', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ fileKey: docToDelete.storagePath }),
+            });
+        }
+
+        // Delete from Firestore
+        await deleteDoc(docRef);
+
+        toast({
+            title: 'Document Deleted',
+            description: `${docToDelete.fileName} has been removed.`,
         });
-      }
 
-      // Delete from Firestore
-      await deleteDoc(docRef);
-
-      toast({
-        title: 'Document Deleted',
-        description: `${docToDelete.fileName} has been removed.`,
-      });
-      
     } catch (error: any) {
-      console.error("Error deleting document: ", error);
-      toast({
-        variant: 'destructive',
-        title: 'Deletion Failed',
-        description: error.message || 'Could not delete the document.',
-      });
+        console.error("Error deleting document: ", error);
+        toast({
+            variant: 'destructive',
+            title: 'Deletion Failed',
+            description: error.message || 'Could not delete the document.',
+        });
     }
   };
 

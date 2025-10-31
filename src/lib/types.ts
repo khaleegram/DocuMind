@@ -15,7 +15,7 @@ export type Document = {
   textContent: string;
   mimeType: string;
   thumbnailUrl: string | null;
-  storagePath: string; // Firebase Storage path
+  storagePath: string; // Path for either Firebase Storage or UploadThing key
 };
 
 export type Folder = {
