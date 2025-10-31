@@ -58,14 +58,22 @@ export default function DashboardHomePage() {
         if (!doc.expiry) return false;
         try {
           const expiryDate = new Date(doc.expiry);
-          // Check if the parsed date is valid before comparing
           if (!isValid(expiryDate)) return false;
           return isAfter(expiryDate, today) && isBefore(expiryDate, ninetyDaysFromNow);
         } catch {
           return false;
         }
       })
-      .sort((a, b) => new Date(a.expiry!).getTime() - new Date(b.expiry!).getTime());
+      .sort((a, b) => {
+        const dateA = a.expiry ? new Date(a.expiry) : null;
+        const dateB = b.expiry ? new Date(b.expiry) : null;
+
+        if (dateA && isValid(dateA) && dateB && isValid(dateB)) {
+          return dateA.getTime() - dateB.getTime();
+        }
+        // Keep original order if dates are invalid
+        return 0;
+      });
   }, [documents]);
 
   const documentTypeChartData = useMemo(() => getChartData(documents), [documents]);
