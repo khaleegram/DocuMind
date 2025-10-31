@@ -14,7 +14,7 @@ import { DocumentTypeChart, getChartData } from '@/components/dashboard/document
 import ExpiringSoonList from '@/components/dashboard/expiring-soon-list';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { subDays, isAfter, isBefore, addDays, isValid } from 'date-fns';
+import { subDays, isAfter, isBefore, addDays, isValid, parseISO } from 'date-fns';
 
 export default function DashboardHomePage() {
   const [user, loadingAuth] = useAuthState(auth);
@@ -53,30 +53,26 @@ export default function DashboardHomePage() {
   const expiringSoonDocs = useMemo(() => {
     const today = new Date();
     const ninetyDaysFromNow = addDays(today, 90);
-    return documents
-      .filter(doc => {
-        if (!doc.expiry) return false;
-        try {
-          const expiryDate = new Date(doc.expiry);
-          if (!isValid(expiryDate)) return false;
-          return isAfter(expiryDate, today) && isBefore(expiryDate, ninetyDaysFromNow);
-        } catch {
-          return false;
-        }
+
+    // 1. Filter documents and parse dates in one go, ensuring validity.
+    const docsWithValidDates = documents
+      .map(doc => {
+        if (!doc.expiry) return null;
+        const expiryDate = parseISO(doc.expiry);
+        if (!isValid(expiryDate)) return null;
+        return { ...doc, expiryDate }; // Keep the parsed date
       })
-      .sort((a, b) => {
-        const dateA = a.expiry ? new Date(a.expiry) : null;
-        const dateB = b.expiry ? new Date(b.expiry) : null;
+      .filter(doc => doc !== null) as (DocumentType & { expiryDate: Date })[];
 
-        if (dateA && isValid(dateA) && dateB && isValid(dateB)) {
-          return dateA.getTime() - dateB.getTime();
-        }
-        // Keep original order if dates are invalid
-        return 0;
-      });
+    // 2. Further filter by date range
+    const expiring = docsWithValidDates.filter(doc =>
+      isAfter(doc.expiryDate, today) && isBefore(doc.expiryDate, ninetyDaysFromNow)
+    );
+
+    // 3. Sort using the guaranteed valid expiryDate object
+    return expiring.sort((a, b) => a.expiryDate.getTime() - b.expiryDate.getTime());
+    
   }, [documents]);
-
-  const documentTypeChartData = useMemo(() => getChartData(documents), [documents]);
 
   if (loadingAuth || isLoadingDocs) {
     return (
@@ -85,6 +81,8 @@ export default function DashboardHomePage() {
       </div>
     );
   }
+
+  const documentTypeChartData = useMemo(() => getChartData(documents), [documents]);
 
   return (
     <div className="flex flex-col flex-1 h-screen overflow-hidden">
