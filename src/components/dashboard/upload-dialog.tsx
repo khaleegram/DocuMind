@@ -1,6 +1,8 @@
+
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Dialog,
   DialogContent,
@@ -11,7 +13,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { auth } from '@/lib/firebase';
 import { UploadDropzone } from '@uploadthing/react';
-import { OurFileRouter } from '@/app/api/uploadthing/core';
+import type { OurFileRouter } from '@/app/api/uploadthing/core';
 import '@uploadthing/react/styles.css';
 
 type UploadDialogProps = {
@@ -21,6 +23,7 @@ type UploadDialogProps = {
 
 export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
   const { toast } = useToast();
+  const router = useRouter();
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -28,13 +31,12 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
         <DialogHeader>
           <DialogTitle>Upload Document(s)</DialogTitle>
           <DialogDescription>
-            Select one or more document files to upload. Processing will happen in the background.
+            Select document or image files. Processing will happen in the background.
           </DialogDescription>
         </DialogHeader>
         <UploadDropzone<OurFileRouter>
             endpoint="documentUploader"
             config={{
-                appendOnPaste: true,
                 mode: "auto",
                 fetch: async (url, { body, headers }) => {
                     const user = auth.currentUser;
@@ -52,25 +54,22 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
                 }
             }}
             onClientUploadComplete={(res) => {
-                // Do something with the response
-                console.log("Files: ", res);
-                toast({
-                    title: "Upload(s) Started!",
-                    description: `Your file(s) are being processed in the background.`,
-                });
-                setIsOpen(false);
+                if (res) {
+                    toast({
+                        title: "Upload(s) Started!",
+                        description: `Your file(s) are being processed. The list will update shortly.`,
+                    });
+                    setIsOpen(false);
+                    // Soft refresh the page to show the new "processing" document
+                    router.refresh();
+                }
             }}
             onUploadError={(error: Error) => {
-                // Do something with the error.
                 toast({
                     variant: 'destructive',
                     title: 'Upload Failed',
                     description: error.message,
                 });
-            }}
-            onUploadBegin={(name) => {
-                // Do something once upload begins
-                console.log("Beginning upload of: ", name);
             }}
         />
       </DialogContent>
