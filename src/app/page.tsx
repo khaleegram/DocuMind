@@ -69,7 +69,7 @@ export default function LoginPage() {
       >
         <motion.div variants={FADE_UP_ANIMATION_VARIANTS} className="flex flex-col items-center mb-8">
             <img
-              src="/logo.png"
+              src="/icon.png"
               alt="DocuMind Logo"
               className="h-28 w-28 sm:h-32 sm:w-32 object-contain filter drop-shadow-[0_0_15px_rgba(59,130,246,0.4)]"
             />
@@ -130,3 +130,5 @@ export default function LoginPage() {
     </main>
   );
 }
+
+    
