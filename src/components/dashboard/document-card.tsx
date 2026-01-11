@@ -18,90 +18,78 @@ export function DocumentCard({ document, onDelete }: { document: Document, onDel
   const router = useRouter();
 
   const renderFilePreview = () => {
-    // Firebase Storage doesn't provide thumbnails for PDFs, so we show a generic icon.
-    // For images, we would ideally use a thumbnail URL if we generated one.
     if (document.mimeType?.startsWith('image/') && document.fileUrl) {
       return (
          <Image 
-            src={document.fileUrl} // Using full URL, could be optimized with thumbnails
+            src={document.fileUrl}
             alt={`Preview of ${document.fileName}`}
-            width={200}
-            height={150}
-            className="object-cover w-full h-full" 
+            fill
+            className="object-cover" 
             data-ai-hint="document image"
         />
       );
     }
     if (document.mimeType === 'application/pdf') {
-      return <FileType className="h-20 w-20 text-muted-foreground" />;
+      return <FileType className="h-20 w-20 text-zinc-600" />;
     }
-    return <FileImage className="h-20 w-20 text-muted-foreground" />;
+    return <FileImage className="h-20 w-20 text-zinc-600" />;
   };
 
 
   if (document.isProcessing) {
     return (
-      <Card className="flex flex-col overflow-hidden rounded-lg shadow-md">
-        <CardHeader className="p-0">
-          <div className="aspect-[4/3] bg-muted flex items-center justify-center">
-            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      <div className="flex flex-col overflow-hidden rounded-[2rem] bg-[#0C0C0E] border border-white/5 p-1 h-full">
+          <div className="relative aspect-[4/3] bg-[#111113] flex items-center justify-center rounded-3xl">
+            <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
           </div>
-        </CardHeader>
-        <CardContent className="flex-1 p-4 space-y-3">
-          <Skeleton className="h-5 w-3/4 rounded" />
-          <Skeleton className="h-4 w-1/2 rounded" />
-          <Skeleton className="h-4 w-1/3 rounded" />
-          <div className="flex flex-wrap gap-2 pt-2">
-            <Skeleton className="h-6 w-16 rounded-full" />
-            <Skeleton className="h-6 w-20 rounded-full" />
-          </div>
-        </CardContent>
-        <CardFooter className="flex justify-between items-center bg-muted/50 p-3">
-           <Skeleton className="h-8 w-20 rounded-md" />
-           <Skeleton className="h-8 w-8 rounded-md" />
-        </CardFooter>
-      </Card>
+        <div className="flex-1 p-5 space-y-4">
+          <Skeleton className="h-5 w-3/4 rounded-lg bg-white/10" />
+          <Skeleton className="h-4 w-1/2 rounded-lg bg-white/5" />
+          <Skeleton className="h-4 w-1/3 rounded-lg bg-white/5" />
+        </div>
+        <div className="flex justify-between items-center p-5 pt-0">
+           <Skeleton className="h-9 w-20 rounded-xl bg-white/5" />
+           <Skeleton className="h-9 w-9 rounded-xl bg-white/5" />
+        </div>
+      </div>
     )
   }
 
   const handleCardClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    // Prevents navigation if a button, link, or interactive element inside the card is clicked.
     if ((e.target as HTMLElement).closest('button, a, [role="menuitem"], [data-collapsible-trigger]')) {
       return;
     }
     router.push(`/dashboard/document/${document.id}`);
   };
   
-  const keywordsToShow = document.keywords.slice(0, 5);
+  const keywordsToShow = document.keywords.slice(0, 3);
   const hiddenKeywordsCount = document.keywords.length - keywordsToShow.length;
 
   return (
-    <Card 
+    <div 
       onClick={handleCardClick}
-      className="flex flex-col overflow-hidden rounded-lg shadow-md transition-shadow hover:shadow-xl cursor-pointer"
+      className="flex flex-col overflow-hidden rounded-[2rem] bg-[#0C0C0E] border border-white/5 transition-all duration-300 hover:border-white/10 hover:shadow-2xl hover:-translate-y-1 cursor-pointer group p-1 h-full"
     >
-      <CardHeader className="p-0">
-        <div className="aspect-[4/3] bg-muted flex items-center justify-center overflow-hidden">
+      <div className="relative aspect-[4/3] bg-[#111113] flex items-center justify-center rounded-3xl overflow-hidden">
           {renderFilePreview()}
-        </div>
-      </CardHeader>
-      <CardContent className="flex-1 p-4">
-        <CardTitle className="mb-2 text-lg font-semibold leading-tight truncate">{document.owner}</CardTitle>
-        <div className="space-y-2 text-sm text-muted-foreground min-h-[7rem]">
+      </div>
+      <div className="flex-1 p-5">
+        <h3 className="mb-2 text-lg font-black tracking-tight text-white truncate">{document.owner}</h3>
+        <div className="space-y-2 text-sm text-zinc-500 min-h-[4rem]">
           <div className="flex items-center gap-2">
             <FileText className="h-4 w-4 shrink-0" />
-            <span>{document.type}</span>
+            <span className="truncate">{document.type}</span>
           </div>
           {document.company && (
             <div className="flex items-center gap-2">
               <Building className="h-4 w-4 shrink-0" />
-              <span>{document.company}</span>
+              <span className="truncate">{document.company}</span>
             </div>
           )}
            {document.country && (
             <div className="flex items-center gap-2">
               <Globe className="h-4 w-4 shrink-0" />
-              <span>{document.country}</span>
+              <span className="truncate">{document.country}</span>
             </div>
           )}
           {document.expiry && (
@@ -110,43 +98,32 @@ export function DocumentCard({ document, onDelete }: { document: Document, onDel
               <span>Expires: {format(parseISO(document.expiry), 'MMM dd, yyyy')}</span>
             </div>
           )}
-
-           <div className="pt-2 flex flex-wrap gap-2">
-                {keywordsToShow.map((keyword, index) => (
-                    <Badge key={`${keyword}-${index}`} variant="secondary">{keyword}</Badge>
-                ))}
-           </div>
         </div>
-
-        <Collapsible open={isSummaryOpen} onOpenChange={setIsSummaryOpen} className="mt-2 text-sm">
-            <CollapsibleContent className="space-y-4">
-                 {document.summary && <p className="text-muted-foreground">{document.summary}</p>}
-                 {hiddenKeywordsCount > 0 && (
-                     <div className="flex flex-wrap gap-2">
-                         {document.keywords.slice(5).map((keyword, index) => (
-                             <Badge key={`${keyword}-${index+5}`} variant="secondary">{keyword}</Badge>
-                         ))}
-                     </div>
-                 )}
-            </CollapsibleContent>
-            {(document.summary || hiddenKeywordsCount > 0) && (
+        
+        <Collapsible open={isSummaryOpen} onOpenChange={setIsSummaryOpen} className="mt-4 text-sm">
+            {(document.summary || document.keywords.length > 0) && (
               <CollapsibleTrigger asChild>
-                  <Button variant="link" className="p-0 h-auto text-xs text-accent" data-collapsible-trigger>
-                      {isSummaryOpen ? 'Read Less' : 'Read More'}
+                  <Button variant="link" className="p-0 h-auto text-xs text-blue-500 hover:text-blue-400" data-collapsible-trigger>
+                      {isSummaryOpen ? 'Show Less' : 'Show More'}
                       <ChevronDown className={`ml-1 h-3 w-3 transition-transform ${isSummaryOpen ? 'rotate-180' : ''}`} />
                   </Button>
               </CollapsibleTrigger>
             )}
+            <CollapsibleContent className="space-y-4 pt-2">
+                 {document.summary && <p className="text-zinc-400 text-xs leading-relaxed">{document.summary}</p>}
+                 {document.keywords.length > 0 && (
+                     <div className="flex flex-wrap gap-2">
+                         {document.keywords.map((keyword, index) => (
+                             <Badge key={`${keyword}-${index}`} variant="secondary" className="bg-white/5 border border-transparent text-zinc-400">{keyword}</Badge>
+                         ))}
+                     </div>
+                 )}
+            </CollapsibleContent>
         </Collapsible>
-      </CardContent>
-      <CardFooter className="flex justify-between items-center bg-muted/50 p-3 mt-auto">
-        <Button asChild size="sm" variant="outline" className="text-accent-foreground bg-accent hover:bg-accent/90 border-0">
-          <a href={document.fileUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
-            <LinkIcon className="mr-2 h-4 w-4" />
-            View
-          </a>
-        </Button>
-         <Button asChild size="sm" variant="outline" >
+      </div>
+
+      <div className="flex justify-between items-center p-5 pt-0 mt-auto">
+        <Button asChild size="sm" variant="outline" className="bg-white/5 border-white/10 hover:bg-white/10 rounded-lg text-zinc-300 hover:text-white">
           <Link href={`/dashboard/document/${document.id}`} onClick={(e) => e.stopPropagation()}>
             <MessageSquare className="mr-2 h-4 w-4" />
             Chat
@@ -154,18 +131,22 @@ export function DocumentCard({ document, onDelete }: { document: Document, onDel
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-500 hover:text-white hover:bg-white/5 rounded-lg">
               <MoreVertical className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onDelete(document.id)} className="text-destructive">
+          <DropdownMenuContent align="end" className="bg-[#111113] border-white/10 text-zinc-300">
+             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); window.open(document.fileUrl, '_blank'); }} className="focus:bg-white/5 focus:text-white">
+              <LinkIcon className="mr-2 h-4 w-4" />
+              View Original
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDelete(document.id) }} className="text-red-500 focus:bg-red-500/10 focus:text-red-400">
               <Trash2 className="mr-2 h-4 w-4" />
               Delete
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-      </CardFooter>
-    </Card>
+      </div>
+    </div>
   );
 }

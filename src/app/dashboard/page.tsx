@@ -111,8 +111,8 @@ export default function DashboardHomePage() {
         <div className="relative flex items-center justify-between gap-4 max-w-4xl mx-auto">
             {/* LEFT: BRAND */}
             <div className="pointer-events-auto bg-[#111113] border border-white/10 p-2 rounded-2xl shadow-2xl flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20 shrink-0">
-                  <Image src="/icon.png" alt="DocuMind Logo" width={24} height={24} />
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0">
+                  <Image src="/logo.png" alt="DocuMind Logo" width={40} height={40} />
                 </div>
                 <div className="pr-3 hidden md:block">
                     <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-bold leading-none mb-1">Secure</p>
@@ -121,7 +121,7 @@ export default function DashboardHomePage() {
             </div>
 
             {/* CENTER: ACTIONS (Desktop only) */}
-            <div className="absolute left-1/2 -translate-x-1/2 pointer-events-auto छिपे हुए md:flex items-center bg-[#111113]/90 backdrop-blur-xl border border-white/10 p-1.5 rounded-[1.2rem] shadow-2xl">
+            <div className="absolute left-1/2 -translate-x-1/2 pointer-events-auto hidden md:flex items-center bg-[#111113]/90 backdrop-blur-xl border border-white/10 p-1.5 rounded-[1.2rem] shadow-2xl">
               <button 
                 onClick={() => setUploadDialogOpen(true)}
                 className="flex items-center gap-2 bg-white text-black hover:bg-zinc-200 px-4 py-2 rounded-[0.9rem] text-xs font-bold transition-all active:scale-95 shadow-lg"

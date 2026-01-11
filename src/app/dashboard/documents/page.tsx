@@ -6,7 +6,7 @@ import type { Document as DocumentType } from '@/lib/types';
 import Header from '@/components/dashboard/header';
 import DocumentList from '@/components/dashboard/document-list';
 import { UploadDialog } from '@/components/dashboard/upload-dialog';
-import { auth, db, storage } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { useRouter } from 'next/navigation';
 import { collection, query, where, onSnapshot, deleteDoc, doc, getDoc } from 'firebase/firestore';
@@ -264,8 +264,8 @@ export default function AllDocumentsPage() {
 
   if (loading || (!user && !loading)) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <Loader2 className="h-16 w-16 animate-spin text-primary" />
+      <div className="flex h-screen items-center justify-center bg-[#050505]">
+        <Loader2 className="h-16 w-16 animate-spin text-blue-600" />
       </div>
     );
   }
@@ -275,29 +275,21 @@ export default function AllDocumentsPage() {
 
 
   return (
-    <div className="lg:grid lg:grid-cols-[280px_1fr] h-screen">
-      <FilterSidebar 
-        filterOptions={filterOptions}
-        activeFilters={activeFilters}
-        onFilterChange={handleFilterChange}
-        onClearFilters={clearFilters}
-        isAiSearchActive={aiSearchResults !== null}
+    <div className="flex flex-col min-h-screen bg-[#050505] text-white font-sans selection:bg-blue-500/40">
+      <Header 
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        onSearchSubmit={handleSearchSubmit}
+        onUploadClick={() => setUploadDialogOpen(true)}
+        onAiSearch={handleAiSearch}
+        isAiSearching={isAiSearching}
+        title="All Documents"
+        showAiSearch={true}
       />
-      <div className="flex flex-col flex-1 overflow-hidden">
-        <Header 
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          onSearchSubmit={handleSearchSubmit}
-          onUploadClick={() => setUploadDialogOpen(true)}
-          onAiSearch={handleAiSearch}
-          isAiSearching={isAiSearching}
-          title="All Documents"
-          showAiSearch={true}
-        />
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+      <main className="flex-1 overflow-y-auto p-4 md:p-6 max-w-7xl mx-auto w-full">
           {showLoader ? (
             <div className="flex items-center justify-center pt-20">
-              <Loader2 className="h-16 w-16 animate-spin text-primary" />
+              <Loader2 className="h-16 w-16 animate-spin text-blue-600" />
             </div>
           ) : (
              showEmptyState
@@ -305,7 +297,13 @@ export default function AllDocumentsPage() {
              : <DocumentList documents={displayedDocuments} onDelete={handleDeleteDocument} />
           )}
         </main>
-      </div>
+      <FilterSidebar 
+        filterOptions={filterOptions}
+        activeFilters={activeFilters}
+        onFilterChange={handleFilterChange}
+        onClearFilters={clearFilters}
+        isAiSearchActive={aiSearchResults !== null}
+      />
       <UploadDialog 
         isOpen={isUploadDialogOpen}
         setIsOpen={setUploadDialogOpen}

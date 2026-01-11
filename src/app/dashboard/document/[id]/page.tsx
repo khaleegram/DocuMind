@@ -9,15 +9,16 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 import type { Document as DocumentType } from '@/lib/types';
 import { Loader2, ArrowLeft, Send, User, Bot, Sparkles, PanelLeft, FileWarning, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import Link from 'next/link';
 import { chatWithDocument } from '@/ai/flows/chat-with-document';
 import { generateSuggestedQuestions } from '@/ai/flows/generate-suggested-questions';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import Header from '@/components/dashboard/header';
+import { UploadDialog } from '@/components/dashboard/upload-dialog';
 
 type Message = {
   sender: 'user' | 'ai';
@@ -32,6 +33,7 @@ export default function DocumentChatPage() {
 
   const [document, setDocument] = useState<DocumentType | null>(null);
   const [isLoadingDoc, setIsLoadingDoc] = useState(true);
+  const [isUploadDialogOpen, setUploadDialogOpen] = useState(false);
   
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -143,15 +145,15 @@ export default function DocumentChatPage() {
 
   if (isLoadingDoc || loadingAuth) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <Loader2 className="h-16 w-16 animate-spin text-primary" />
+      <div className="flex h-screen items-center justify-center bg-[#050505]">
+        <Loader2 className="h-16 w-16 animate-spin text-blue-600" />
       </div>
     );
   }
 
   if (!document) {
      return (
-      <div className="flex h-screen items-center justify-center">
+      <div className="flex h-screen items-center justify-center bg-[#050505]">
         <p>Document not found.</p>
       </div>
     );
@@ -160,15 +162,15 @@ export default function DocumentChatPage() {
   const DocumentViewer = () => {
      if (document.mimeType === 'application/pdf') {
       return (
-        <div className="w-full h-full p-8 flex flex-col items-center justify-center bg-muted">
-            <Alert>
-                <FileWarning className="h-4 w-4" />
-                <AlertTitle>PDF Preview Not Available</AlertTitle>
-                <AlertDescription>
-                    Directly viewing PDFs is not supported for security reasons. You can view the document by opening it in a new tab.
+        <div className="w-full h-full p-8 flex flex-col items-center justify-center bg-[#0C0C0E] rounded-3xl border border-white/5">
+            <Alert className="bg-[#111113] border-blue-500/20 text-blue-400">
+                <FileWarning className="h-4 w-4 !text-blue-400" />
+                <AlertTitle>PDF Preview Unavailable</AlertTitle>
+                <AlertDescription className="text-blue-400/80">
+                    Directly viewing PDFs is not supported. You can view the document by opening it in a new tab.
                 </AlertDescription>
             </Alert>
-             <Button asChild className="mt-4">
+             <Button asChild className="mt-4 bg-blue-600 hover:bg-blue-500 text-white font-bold">
                 <a href={document.fileUrl} target="_blank" rel="noopener noreferrer">
                   <ExternalLink className="mr-2" />
                   Open PDF in New Tab
@@ -177,53 +179,63 @@ export default function DocumentChatPage() {
         </div>
       )
     }
-    return <iframe src={document.fileUrl} className="w-full h-full border-0" title={document.fileName} />
+    return <iframe src={document.fileUrl} className="w-full h-full border-0 rounded-3xl" title={document.fileName} />
   }
 
   const ChatPanel = () => (
-     <Card className="flex-1 flex flex-col border-0 rounded-none h-full">
-        <CardHeader>
-          <CardTitle>Chat with Document</CardTitle>
-          <CardDescription>Ask questions and get answers based on the document's content.</CardDescription>
-        </CardHeader>
-        <CardContent className="flex-1 flex flex-col overflow-hidden">
-          <ScrollArea className="flex-1 pr-4" ref={scrollAreaRef}>
-            <div className="space-y-4">
+     <div className="flex-1 flex flex-col h-full bg-[#0C0C0E] border border-white/5 rounded-3xl overflow-hidden">
+        <div className="p-6 border-b border-white/5">
+          <h2 className="text-xl font-black tracking-tight text-white">INTELLIGENCE AGENT</h2>
+          <p className="text-sm text-zinc-500">Ask questions about this document.</p>
+        </div>
+        <div className="flex-1 flex flex-col overflow-hidden p-6">
+          <ScrollArea className="flex-1 -mx-6 px-6" ref={scrollAreaRef}>
+            <div className="space-y-6 pb-4">
               {messages.map((message, index) => (
                 <div key={index} className={`flex items-start gap-3 ${message.sender === 'user' ? 'justify-end' : ''}`}>
-                  {message.sender === 'ai' && <AvatarIcon><Bot /></AvatarIcon>}
-                  <div className={`rounded-lg px-4 py-3 text-sm max-w-[80%] ${message.sender === 'ai' ? 'bg-muted' : 'bg-primary text-primary-foreground'}`}>
+                  {message.sender === 'ai' && (
+                     <div className="w-8 h-8 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
+                        <Bot size={16}/>
+                     </div>
+                  )}
+                  <div className={`rounded-2xl px-4 py-3 text-sm max-w-[80%] ${message.sender === 'ai' ? 'bg-[#111113] border border-white/5 text-zinc-300' : 'bg-blue-600 text-white'}`}>
                     <p>{message.text}</p>
                   </div>
-                  {message.sender === 'user' && <AvatarIcon><User /></AvatarIcon>}
+                  {message.sender === 'user' && (
+                    <div className="w-8 h-8 rounded-full bg-zinc-800 border border-white/10 flex items-center justify-center text-zinc-400 shrink-0">
+                        <User size={16} />
+                     </div>
+                  )}
                 </div>
               ))}
                {isAnswering && (
                   <div className="flex items-start gap-3">
-                    <AvatarIcon><Bot /></AvatarIcon>
-                    <div className="rounded-lg px-4 py-3 text-sm bg-muted flex items-center">
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                     <div className="w-8 h-8 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                     </div>
+                    <div className="rounded-2xl px-4 py-3 text-sm bg-[#111113] border border-white/5 text-zinc-300 flex items-center">
+                      Thinking...
                     </div>
                   </div>
                 )}
             </div>
           </ScrollArea>
            {(isLoadingSuggestions || suggestedQuestions.length > 0) && (
-            <div className="mt-4 border-t pt-4">
-              <div className="flex items-center gap-2 mb-2">
-                 <Sparkles className="h-4 w-4 text-accent" />
-                 <h4 className="text-sm font-semibold">Suggested Questions</h4>
+            <div className="mt-4 border-t border-white/5 pt-4">
+              <div className="flex items-center gap-2 mb-3">
+                 <Sparkles size={14} className="text-blue-500" />
+                 <h4 className="text-xs font-bold uppercase tracking-widest text-zinc-500">Suggestions</h4>
               </div>
               {isLoadingSuggestions ? (
                 <div className="space-y-2">
-                  <Skeleton className="h-9 w-full rounded-md" />
-                  <Skeleton className="h-9 w-2/3 rounded-md" />
-                  <Skeleton className="h-9 w-3/4 rounded-md" />
+                  <Skeleton className="h-9 w-full rounded-xl bg-white/5" />
+                  <Skeleton className="h-9 w-2/3 rounded-xl bg-white/5" />
+                  <Skeleton className="h-9 w-3/4 rounded-xl bg-white/5" />
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {suggestedQuestions.map((q, i) => (
-                    <Button key={i} variant="outline" size="sm" onClick={() => handleSuggestionClick(q)} disabled={isAnswering}>
+                    <Button key={i} variant="outline" size="sm" onClick={() => handleSuggestionClick(q)} disabled={isAnswering} className="bg-white/5 border-white/10 hover:bg-white/10 rounded-lg text-zinc-300 hover:text-white">
                       {q}
                     </Button>
                   ))}
@@ -231,86 +243,83 @@ export default function DocumentChatPage() {
               )}
             </div>
            )}
-          <div className="mt-4 border-t pt-4">
-            <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+          <div className="mt-4 border-t border-white/5 pt-4">
+            <form onSubmit={handleSendMessage} className="flex items-center gap-3">
               <Input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Ask a question..."
                 autoComplete="off"
                 disabled={isAnswering || document.isProcessing}
+                className="bg-[#111113] border-white/10 rounded-xl h-12 focus-visible:ring-blue-500"
               />
-              <Button type="submit" disabled={!input.trim() || isAnswering || document.isProcessing}>
-                <Send className="h-4 w-4" />
+              <Button type="submit" size="icon" className="h-12 w-12 shrink-0 bg-blue-600 hover:bg-blue-500 rounded-xl" disabled={!input.trim() || isAnswering || document.isProcessing}>
+                <Send className="h-5 w-5" />
                 <span className="sr-only">Send</span>
               </Button>
             </form>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
   )
 
   return (
-    <div className="flex h-screen flex-col">
-      <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm md:px-6">
-        <Button asChild variant="ghost" size="icon" className="h-10 w-10">
-          <Link href="/dashboard">
-            <ArrowLeft />
-            <span className="sr-only">Back to Dashboard</span>
-          </Link>
-        </Button>
-        <div className="flex flex-col">
-            <h1 className="text-lg font-semibold truncate">{document.owner}</h1>
-            <p className="text-sm text-muted-foreground">{document.type}</p>
+    <div className="min-h-screen bg-[#050505] text-white font-sans selection:bg-blue-500/40">
+      <Header
+        onUploadClick={() => setUploadDialogOpen(true)}
+        title={document.owner}
+        showSearch={false}
+        showAiSearch={false}
+      />
+       <nav className="p-4 md:px-8">
+         <div className="max-w-7xl mx-auto">
+            <Button asChild variant="ghost" className="text-zinc-400 hover:text-white hover:bg-white/5 -ml-4">
+              <Link href="/dashboard/documents">
+                <ArrowLeft />
+                <span>Back to All Documents</span>
+              </Link>
+            </Button>
+         </div>
+       </nav>
+
+      <main className="flex-1 overflow-hidden px-4 md:px-8 pb-8">
+        <div className="h-full hidden md:grid md:grid-cols-2 gap-6 max-w-7xl mx-auto">
+          <div className="h-full overflow-hidden p-4 bg-[#0C0C0E] rounded-3xl border border-white/5">
+             <DocumentViewer />
+          </div>
+          <div className="h-full flex flex-col">
+            <ChatPanel />
+          </div>
         </div>
-         <div className="ml-auto md:hidden">
+         <div className="h-[calc(100vh-140px)] md:hidden flex flex-col">
+            <ChatPanel />
+         </div>
+      </main>
+
+       <div className="fixed bottom-6 right-6 z-50 md:hidden">
             <Sheet>
                 <SheetTrigger asChild>
-                    <Button variant="outline" size="icon">
+                    <Button variant="outline" size="icon" className="w-14 h-14 rounded-full bg-white/10 border-white/20 backdrop-blur-lg text-white">
                         <PanelLeft />
-                        <span className="sr-only">View Document and Chat</span>
+                        <span className="sr-only">View Document</span>
                     </Button>
                 </SheetTrigger>
-                <SheetContent side="right" className="w-full max-w-none sm:max-w-none p-0">
-                    <div className="h-full flex flex-col">
-                        <SheetHeader className="p-4 border-b">
-                            <SheetTitle>Document & Chat</SheetTitle>
-                        </SheetHeader>
-                        <div className="flex-1 overflow-y-auto">
-                             <div className="h-[50vh]">
-                                <DocumentViewer />
-                            </div>
-                            <div className="h-[50vh]">
-                               <ChatPanel />
-                            </div>
+                <SheetContent side="bottom" className="h-[80vh] flex flex-col bg-[#050505] text-white border-t border-white/10 p-0">
+                     <SheetHeader className="p-4 border-b border-white/10 text-left">
+                        <SheetTitle className="text-white">Document Viewer</SheetTitle>
+                        <SheetDescription className="text-zinc-400">
+                            {document.fileName}
+                        </SheetDescription>
+                    </SheetHeader>
+                    <div className="flex-1 overflow-y-auto p-4">
+                        <div className="h-full">
+                            <DocumentViewer />
                         </div>
                     </div>
                 </SheetContent>
             </Sheet>
-         </div>
-      </header>
-
-      <main className="flex-1 overflow-hidden">
-        <div className="h-full hidden md:flex">
-          <div className="w-1/2 h-full overflow-y-auto border-r p-4 bg-muted">
-             <DocumentViewer />
-          </div>
-          <div className="w-1/2 h-full flex flex-col">
-            <ChatPanel />
-          </div>
-        </div>
-         <div className="h-full md:hidden flex flex-col">
-            <ChatPanel />
-        </div>
-      </main>
+       </div>
+      <UploadDialog isOpen={isUploadDialogOpen} setIsOpen={setUploadDialogOpen} />
     </div>
   );
-}
-
-function AvatarIcon({ children }: { children: React.ReactNode }) {
-    return (
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary text-secondary-foreground">
-            {children}
-        </div>
-    );
 }
