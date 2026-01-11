@@ -47,7 +47,7 @@ function AiSearchAgent({ onAiSearch, isSearching, initialQuery }: { onAiSearch: 
     
     return (
         <form onSubmit={handleSearch} className="relative w-full sm:w-auto">
-            <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-accent" />
+            <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input 
                 placeholder="AI Search: e.g., 'Danish visa for John Doe'"
                 value={query}

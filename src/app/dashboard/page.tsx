@@ -112,7 +112,7 @@ export default function DashboardHomePage() {
             {/* LEFT: BRAND */}
             <div className="pointer-events-auto bg-[#111113] border border-white/10 p-2 rounded-2xl shadow-2xl flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20 shrink-0">
-                  <Image src="/logo.png" alt="DocuMind Logo" width={24} height={24} />
+                  <Image src="/icon.png" alt="DocuMind Logo" width={24} height={24} />
                 </div>
                 <div className="pr-3 hidden md:block">
                     <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-bold leading-none mb-1">Secure</p>
