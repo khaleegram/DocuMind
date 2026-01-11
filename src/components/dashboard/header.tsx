@@ -48,7 +48,7 @@ function AiSearchAgent({ onAiSearch, isSearching, initialQuery }: { onAiSearch: 
     return (
         <form onSubmit={handleSearch} className="relative w-full">
              <Input 
-                placeholder="AI Search: e.g., 'Danish visa for John Doe'"
+                placeholder="AI Search: e.g., 'Acme Corp invoice from last month'"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 disabled={isSearching}
@@ -154,7 +154,7 @@ export default function Header({
           onClick={() => router.push('/dashboard')}
         >
           <div className="w-10 h-10 flex items-center justify-center shrink-0">
-            <Image src="/logo.png" alt="DocuMind Logo" width={40} height={40} />
+            <Image src="/icon.png" alt="DocuMind Logo" width={40} height={40} />
           </div>
           <div className="pr-3 hidden md:block">
               <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-bold leading-none mb-1">DocuMind</p>
