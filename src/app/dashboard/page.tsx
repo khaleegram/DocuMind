@@ -74,6 +74,8 @@ export default function DashboardHomePage() {
     
   }, [documents]);
 
+  const documentTypeChartData = useMemo(() => getChartData(documents), [documents]);
+
   if (loadingAuth || isLoadingDocs) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -81,8 +83,6 @@ export default function DashboardHomePage() {
       </div>
     );
   }
-
-  const documentTypeChartData = useMemo(() => getChartData(documents), [documents]);
 
   return (
     <div className="flex flex-col flex-1 h-screen overflow-hidden">
