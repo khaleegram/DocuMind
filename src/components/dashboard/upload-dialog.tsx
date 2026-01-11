@@ -1,7 +1,6 @@
 
 'use client';
 
-import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Dialog,
@@ -38,26 +37,21 @@ export function UploadDialog({ isOpen, setIsOpen }: UploadDialogProps) {
             endpoint="documentUploader"
             config={{
                 mode: "auto",
-                fetch: async (url, { body, headers }) => {
-                    const user = auth.currentUser;
-                    if (!user) {
-                        throw new Error("You must be logged in to upload files.");
+                fetcher: {
+                    // This is the key change to add the auth header
+                    // @ts-ignore
+                    getAuthorizationToken: async () => {
+                        const user = auth.currentUser;
+                        if (!user) return null;
+                        return await user.getIdToken();
                     }
-                    const token = await user.getIdToken();
-                    return fetch(url, {
-                        body,
-                        headers: {
-                            ...headers,
-                            Authorization: `Bearer ${token}`,
-                        }
-                    })
                 }
             }}
             onClientUploadComplete={(res) => {
                 if (res) {
                     toast({
-                        title: "Upload(s) Started!",
-                        description: `Your file(s) are being processed. The list will update shortly.`,
+                        title: "Upload(s) Complete!",
+                        description: `Your file(s) are being processed and will appear shortly.`,
                     });
                     setIsOpen(false);
                     // Soft refresh the page to show the new "processing" document

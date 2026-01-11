@@ -11,9 +11,14 @@ import { extractTextFromImage } from '@/ai/flows/extract-text-from-image';
 import type { NextRequest } from 'next/server';
 
 const db = getFirestore(admin.apps[0]!);
-const f = createUploadthing();
+const f = createUploadthing({
+    errorFormatter: (err) => {
+      console.log("Error uploading file", err.message);
+      return { message: err.message };
+    },
+});
 
-const handleAuth = async ({ req }: { req: NextRequest }) => {
+const handleAuth = async ({ req }: { req: Request }) => {
     const authHeader = req.headers.get("authorization");
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         throw new UploadThingError("Unauthorized: No token provided");
@@ -35,15 +40,16 @@ export const ourFileRouter = {
     pdf: { maxFileSize: "16MB" },
     image: { maxFileSize: "4MB" } 
   })
-    .middleware(handleAuth)
+    .middleware(async ({ req }) => {
+        return handleAuth({ req });
+    })
     .onUploadComplete(async ({ metadata, file }) => {
       console.log('Upload complete for userId:', metadata.userId);
-      console.log('file url', file.url);
-      console.log('file key', file.key);
-
-      // Create a temporary document to show the user it's processing
+      
       const docRef = db.collection('documents').doc();
-      await docRef.set({
+      
+      // Don't block the response. The client will get this and know to wait.
+      const initialState = {
         userId: metadata.userId,
         fileName: file.name,
         fileUrl: file.url,
@@ -59,22 +65,27 @@ export const ourFileRouter = {
         company: null,
         country: null,
         isProcessing: true,
-      });
+      };
 
-      // AI processing in the background - don't await this on the server
-      processFileInBackground(docRef.id, file.url, file.type);
+      await docRef.set(initialState);
+      
+      // Start AI processing in the background, but don't await it here.
+      processFileInBackground(docRef.id, file);
 
-      return { uploadedBy: metadata.userId };
+      // Return the initial data to the client immediately
+      return { 
+          docId: docRef.id 
+      };
     }),
 } satisfies FileRouter;
 
 
-async function processFileInBackground(docId: string, fileUrl: string, mimeType: string) {
+async function processFileInBackground(docId: string, file: { url: string, type: string }) {
     try {
-        const response = await fetch(fileUrl);
+        const response = await fetch(file.url);
         const blob = await response.blob();
         const buffer = Buffer.from(await blob.arrayBuffer());
-        const dataUrl = `data:${mimeType};base64,${buffer.toString('base64')}`;
+        const dataUrl = `data:${file.type};base64,${buffer.toString('base64')}`;
         
         // Run AI extractions in parallel
         const [metadataResult, textResult] = await Promise.all([
@@ -84,25 +95,25 @@ async function processFileInBackground(docId: string, fileUrl: string, mimeType:
 
         const { text } = textResult;
         
-        // Generate keywords based on extracted text
+        // Run keyword enhancement after text is extracted
         const { keywords } = await enhanceSearchWithKeywords({ documentText: text });
 
-        // Update the document in Firestore with the extracted data
+        // Update the document with all the extracted metadata
         await db.collection('documents').doc(docId).update({
             ...metadataResult,
             keywords,
             textContent: text,
-            isProcessing: false,
+            isProcessing: false, // Mark processing as complete
         });
 
         console.log(`Successfully processed and updated document ${docId}`);
 
     } catch (aiError: any) {
         console.error(`AI processing failed for document ${docId}:`, aiError);
-        // Update the document to reflect the error state
         await db.collection('documents').doc(docId).update({
             isProcessing: false,
             type: 'Processing Failed',
+            owner: 'Processing Failed',
             summary: `Error: ${aiError.message || 'Could not analyze the document.'}`,
         });
     }
