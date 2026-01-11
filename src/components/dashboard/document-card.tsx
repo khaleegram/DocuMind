@@ -4,7 +4,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { FileText, Calendar, Building, MoreVertical, Link as LinkIcon, Trash2, Loader2, MessageSquare, FileImage, FileType, ChevronDown, Globe } from 'lucide-react';
+import { FileText, Calendar, Tag, MoreVertical, Link as LinkIcon, Trash2, Loader2, MessageSquare, FileImage, FileType, ChevronDown, Folder } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { format, parseISO } from 'date-fns';
@@ -62,8 +62,7 @@ export function DocumentCard({ document, onDelete }: { document: Document, onDel
     router.push(`/dashboard/document/${document.id}`);
   };
   
-  const keywordsToShow = document.keywords.slice(0, 3);
-  const hiddenKeywordsCount = document.keywords.length - keywordsToShow.length;
+  const tagsToShow = document.tags?.slice(0, 3) || [];
 
   return (
     <div 
@@ -75,23 +74,11 @@ export function DocumentCard({ document, onDelete }: { document: Document, onDel
       </div>
       <div className="flex-1 p-5">
         <h3 className="mb-2 text-lg font-black tracking-tight text-white truncate">{document.owner}</h3>
-        <div className="space-y-2 text-sm text-zinc-500 min-h-[4rem]">
+        <div className="space-y-2 text-sm text-zinc-500 min-h-[2.5rem]">
           <div className="flex items-center gap-2">
-            <FileText className="h-4 w-4 shrink-0" />
-            <span className="truncate">{document.type}</span>
+            <Folder className="h-4 w-4 shrink-0" />
+            <span className="truncate">{document.category}</span>
           </div>
-          {document.company && (
-            <div className="flex items-center gap-2">
-              <Building className="h-4 w-4 shrink-0" />
-              <span className="truncate">{document.company}</span>
-            </div>
-          )}
-           {document.country && (
-            <div className="flex items-center gap-2">
-              <Globe className="h-4 w-4 shrink-0" />
-              <span className="truncate">{document.country}</span>
-            </div>
-          )}
           {document.expiry && (
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 shrink-0" />
@@ -101,7 +88,7 @@ export function DocumentCard({ document, onDelete }: { document: Document, onDel
         </div>
         
         <Collapsible open={isSummaryOpen} onOpenChange={setIsSummaryOpen} className="mt-4 text-sm">
-            {(document.summary || document.keywords.length > 0) && (
+            {(document.summary || tagsToShow.length > 0) && (
               <CollapsibleTrigger asChild>
                   <Button variant="link" className="p-0 h-auto text-xs text-blue-500 hover:text-blue-400" data-collapsible-trigger>
                       {isSummaryOpen ? 'Show Less' : 'Show More'}
@@ -111,10 +98,10 @@ export function DocumentCard({ document, onDelete }: { document: Document, onDel
             )}
             <CollapsibleContent className="space-y-4 pt-2">
                  {document.summary && <p className="text-zinc-400 text-xs leading-relaxed">{document.summary}</p>}
-                 {document.keywords.length > 0 && (
+                 {tagsToShow.length > 0 && (
                      <div className="flex flex-wrap gap-2">
-                         {document.keywords.map((keyword, index) => (
-                             <Badge key={`${keyword}-${index}`} variant="secondary" className="bg-white/5 border border-transparent text-zinc-400">{keyword}</Badge>
+                         {tagsToShow.map((tag, index) => (
+                             <Badge key={`${tag}-${index}`} variant="secondary" className="bg-white/5 border border-transparent text-zinc-400">{tag}</Badge>
                          ))}
                      </div>
                  )}

@@ -17,7 +17,7 @@ import Fuse from 'fuse.js';
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { intelligentSearch } from '@/ai/flows/intelligent-search';
 
-export type FilterCategory = 'owner' | 'type' | 'company' | 'country';
+export type FilterCategory = 'category' | 'tags';
 
 // Function to find the canonical name for a given value
 const findCanonicalName = (value: string, existingNames: Set<string>): string => {
@@ -44,10 +44,8 @@ export default function AllDocumentsPage() {
   const [aiSearchResults, setAiSearchResults] = useState<DocumentType[] | null>(null);
   const [isAiSearching, setIsAiSearching] = useState(false);
   const [activeFilters, setActiveFilters] = useState<Record<FilterCategory, Set<string>>>({
-    owner: new Set(),
-    type: new Set(),
-    company: new Set(),
-    country: new Set(),
+    category: new Set(),
+    tags: new Set(),
   });
   const { toast } = useToast();
 
@@ -80,38 +78,24 @@ export default function AllDocumentsPage() {
 
   const filterOptions = useMemo(() => {
     const options: Record<FilterCategory, Set<string>> = {
-      owner: new Set(),
-      type: new Set(),
-      company: new Set(),
-      country: new Set(),
+      category: new Set(),
+      tags: new Set(),
     };
     documents.forEach(doc => {
-      // Normalize and group owners
-      if (doc.owner) {
-          const canonicalOwner = findCanonicalName(doc.owner, options.owner);
-          options.owner.add(canonicalOwner);
+      if (doc.category && doc.category !== 'Processing...') {
+          const canonicalCategory = findCanonicalName(doc.category, options.category);
+          options.category.add(canonicalCategory);
       }
-      // Normalize and group types
-      if (doc.type) {
-          const canonicalType = findCanonicalName(doc.type, options.type);
-          options.type.add(canonicalType);
-      }
-      // Normalize and group companies
-      if (doc.company) {
-          const canonicalCompany = findCanonicalName(doc.company, options.company);
-          options.company.add(canonicalCompany);
-      }
-      // Normalize and group countries
-       if (doc.country) {
-          const canonicalCountry = findCanonicalName(doc.country, options.country);
-          options.country.add(canonicalCountry);
+      if (doc.tags && Array.isArray(doc.tags)) {
+        doc.tags.forEach(tag => {
+            const canonicalTag = findCanonicalName(tag, options.tags);
+            options.tags.add(canonicalTag);
+        });
       }
     });
     return {
-        owner: Array.from(options.owner).sort(),
-        type: Array.from(options.type).sort(),
-        company: Array.from(options.company).sort(),
-        country: Array.from(options.country).sort(),
+        category: Array.from(options.category).sort(),
+        tags: Array.from(options.tags).sort(),
     }
   }, [documents]);
 
@@ -129,7 +113,7 @@ export default function AllDocumentsPage() {
   }, []);
 
   const clearFilters = useCallback(() => {
-    setActiveFilters({ owner: new Set(), type: new Set(), company: new Set(), country: new Set() });
+    setActiveFilters({ category: new Set(), tags: new Set() });
     setAiSearchResults(null);
     setSearchQuery('');
     setSubmittedSearchQuery('');
@@ -145,9 +129,8 @@ export default function AllDocumentsPage() {
       const documentsToSearch = documents.map(doc => ({
         id: doc.id,
         owner: doc.owner,
-        type: doc.type,
-        company: doc.company ?? null,
-        country: doc.country ?? null,
+        category: doc.category,
+        tags: doc.tags,
         summary: doc.summary ?? null,
         keywords: doc.keywords,
       }));
@@ -239,6 +222,16 @@ export default function AllDocumentsPage() {
                 if (values.size === 0) return true;
                 const cat = category as FilterCategory;
                 const docValue = doc[cat];
+                
+                if (cat === 'tags') {
+                    if (!Array.isArray(docValue) || docValue.length === 0) return false;
+                    // Check if any of the document's tags fuzzily match any of the selected filter tags
+                    return Array.from(values).some(filterTag => {
+                        const fuse = new Fuse(docValue, { threshold: 0.2, ignoreLocation: true });
+                        return fuse.search(filterTag).length > 0;
+                    });
+                }
+
                 if (!docValue) return false;
 
                 // Check if the doc's value fuzzily matches any of the selected canonical filter values
@@ -251,7 +244,7 @@ export default function AllDocumentsPage() {
     // Apply fuzzy search on top of filters
     if (submittedSearchQuery) {
         const fuse = new Fuse(filtered, {
-            keys: ['owner', 'company', 'type', 'keywords', 'summary', 'textContent', 'country'],
+            keys: ['owner', 'category', 'tags', 'keywords', 'summary', 'textContent'],
             threshold: 0.4, 
             includeScore: true,
         });

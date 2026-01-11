@@ -21,10 +21,8 @@ type FilterSidebarProps = {
 };
 
 const categoryDisplayNames: Record<FilterCategory, string> = {
-  owner: 'Owners',
-  company: 'Companies',
-  type: 'Document Types',
-  country: 'Countries',
+  category: 'Categories',
+  tags: 'Tags',
 };
 
 function FilterCategorySection({
@@ -110,11 +108,9 @@ export default function FilterSidebar({ filterOptions, activeFilters, onFilterCh
                 <p>Clear results to use manual filters.</p>
             </div>
          ) : (
-            <Accordion type="multiple" defaultValue={['owner', 'company', 'type', 'country']} className="w-full px-4">
-                <FilterCategorySection category="owner" options={filterOptions.owner} activeOptions={activeFilters.owner} onFilterChange={onFilterChange} />
-                <FilterCategorySection category="company" options={filterOptions.company} activeOptions={activeFilters.company} onFilterChange={onFilterChange} />
-                <FilterCategorySection category="type" options={filterOptions.type} activeOptions={activeFilters.type} onFilterChange={onFilterChange} />
-                <FilterCategorySection category="country" options={filterOptions.country} activeOptions={activeFilters.country} onFilterChange={onFilterChange} />
+            <Accordion type="multiple" defaultValue={['category', 'tags']} className="w-full px-4">
+                <FilterCategorySection category="category" options={filterOptions.category} activeOptions={activeFilters.category} onFilterChange={onFilterChange} />
+                <FilterCategorySection category="tags" options={filterOptions.tags} activeOptions={activeFilters.tags} onFilterChange={onFilterChange} />
             </Accordion>
          )}
       </ScrollArea>
@@ -124,7 +120,7 @@ export default function FilterSidebar({ filterOptions, activeFilters, onFilterCh
   return (
     <>
         {/* Mobile Sheet Trigger */}
-        <div className="fixed bottom-6 right-6 z-40">
+        <div className="fixed bottom-6 right-6 z-40 lg:hidden">
              <Sheet open={isSheetOpen} onOpenChange={setSheetOpen}>
                 <SheetTrigger asChild>
                     <Button size="icon" className="rounded-full w-14 h-14 shadow-lg bg-white text-black hover:bg-zinc-200 transition-all active:scale-95">
@@ -156,6 +152,11 @@ export default function FilterSidebar({ filterOptions, activeFilters, onFilterCh
                 </SheetContent>
             </Sheet>
         </div>
+        
+        {/* Desktop Sidebar */}
+        <aside className="hidden lg:flex flex-col w-72 bg-[#0C0C0E] border-l border-white/5 h-screen sticky top-0 right-0">
+             <FilterContent />
+        </aside>
     </>
   );
 }

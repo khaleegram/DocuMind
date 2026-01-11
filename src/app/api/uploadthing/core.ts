@@ -57,13 +57,12 @@ export const ourFileRouter = {
         mimeType: file.type,
         uploadedAt: new Date(),
         owner: 'Processing...',
-        type: 'Processing...',
+        category: 'Processing...',
         keywords: [],
+        tags: [],
         summary: 'Processing...',
         textContent: '',
         expiry: null,
-        company: null,
-        country: null,
         isProcessing: true,
       };
 
@@ -112,7 +111,7 @@ async function processFileInBackground(docId: string, file: { url: string, type:
         console.error(`AI processing failed for document ${docId}:`, aiError);
         await db.collection('documents').doc(docId).update({
             isProcessing: false,
-            type: 'Processing Failed',
+            category: 'Processing Failed',
             owner: 'Processing Failed',
             summary: `Error: ${aiError.message || 'Could not analyze the document.'}`,
         });

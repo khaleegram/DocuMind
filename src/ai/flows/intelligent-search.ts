@@ -9,15 +9,14 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
+import { z } from 'zod';
 
 // Simplified Document schema for passing to the AI
 const DocumentSearchSchema = z.object({
   id: z.string(),
   owner: z.string(),
-  type: z.string(),
-  company: z.string().nullable(),
-  country: z.string().nullable(),
+  category: z.string(),
+  tags: z.array(z.string()),
   summary: z.string().nullable(),
   keywords: z.array(z.string()),
 });
@@ -45,12 +44,12 @@ const prompt = ai.definePrompt({
   name: 'intelligentSearchPrompt',
   input: { schema: IntelligentSearchInputSchema },
   output: { schema: IntelligentSearchOutputSchema },
-  prompt: `You are an intelligent search engine for a user's personal documents.
+  prompt: `You are an intelligent search engine for a user's personal document vault.
 Your task is to analyze the user's search query and the provided list of documents.
 You must identify the most relevant documents that match the user's query.
 
-Consider all fields for each document: owner, type, company, country, summary, and keywords.
-The match does not have to be exact. Use contextual understanding. For example, a query for "John's driver license" should match a document with owner "John Doe" and type "Drivers License". A query for "Acme Corp invoice" should match a document for company "Acme Corporation" and type "Receipt".
+Consider all fields for each document: owner, category, tags, summary, and keywords.
+The match does not have to be exact. Use contextual understanding. For example, a query for "John's driver license" should match a document with owner "John Doe" and category "Personal ID". A query for "Acme Corp invoice" should match a document with owner "Acme Corporation" and category "Financial" with a tag "invoice".
 
 Return an array containing the 'id' of each matching document. If no documents are a good match, return an empty array.
 

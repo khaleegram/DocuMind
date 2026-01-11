@@ -2,10 +2,9 @@ export type Document = {
   id: string;
   userId: string;
   owner: string;
-  company: string | null;
-  type: string;
+  category: string;
+  tags: string[];
   expiry: string | null;
-  country: string | null;
   keywords: string[];
   uploadedAt: string;
   fileUrl: string;

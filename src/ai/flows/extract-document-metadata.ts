@@ -22,11 +22,10 @@ export type ExtractDocumentMetadataInput = z.infer<
 >;
 
 const ExtractDocumentMetadataOutputSchema = z.object({
-  owner: z.string().describe('The full name of the primary person on the document, formatted as "Firstname Lastname". If no person is present, use the primary company name, formatted in Title Case.'),
-  company: z.string().nullable().describe('The name of the company or organization on the document, formatted in Title Case. Use null if not applicable.'),
-  documentType: z.string().describe('The type of document (e.g., "Passport", "Drivers License", "Contract", "Receipt"), formatted in Title Case.'),
+  owner: z.string().describe('The full name of the primary person on the document, formatted as "Firstname Lastname". If no person is present, use the primary company name or a descriptive title, formatted in Title Case.'),
+  category: z.string().describe('The general category of the document (e.g., "Personal ID", "Financial", "Work", "Legal", "Receipt"), formatted in Title Case.'),
   expiryDate: z.string().nullable().describe('The expiration date of the document in YYYY-MM-DD format, or null if not found.'),
-  country: z.string().nullable().describe('The country of origin of the document (e.g., "United States", "Canada", "France"), formatted in Title Case. If not found, use null.'),
+  tags: z.array(z.string()).describe('A list of 2-4 specific, relevant tags for organization (e.g., "contract", "invoice", "bank-statement").'),
   keywords: z.array(z.string()).describe('A list of 3-5 relevant keywords for search.'),
   summary: z.string().describe("A concise, one-to-two sentence summary of the document's content."),
 });
@@ -44,16 +43,16 @@ const prompt = ai.definePrompt({
   name: 'extractDocumentMetadataPrompt',
   input: {schema: ExtractDocumentMetadataInputSchema},
   output: {schema: ExtractDocumentMetadataOutputSchema},
-  prompt: `You are an AI assistant specialized in extracting and normalizing key information from document images.
-  Your primary goal is to accurately identify the document's owner.
+  prompt: `You are an AI assistant specialized in extracting and organizing information from various personal and business documents. Your goal is to categorize and tag these documents for a personal vault.
 
   Analyze the following document image and extract the required metadata.
 
   **CRITICAL NORMALIZATION RULES:**
-  - **Owner Field (Top Priority):** Scrutinize the document for a person's name. It could be labeled as "Name", "To", "For", etc. If a person's name and a company name are both present, the person's name MUST be used as the owner. You MUST reformat the name to "Firstname Lastname" order and apply Title Case. For example, if the document says "DOE, JOHN" or "john doe", you must return "John Doe". If, and only if, no person is clearly identified, use the primary company name as the owner, formatted in Title Case.
-  - **Other Text Fields:** For 'company', 'documentType', and 'country', you MUST format them in Title Case (e.g., "Innovate Inc.", "Drivers License", "United States"). This ensures consistency.
+  - **Owner Field (Top Priority):** Scrutinize the document for a person's name. It could be labeled as "Name", "To", "For", etc. If a person's name and a company name are both present, the person's name MUST be used as the owner. You MUST reformat the name to "Firstname Lastname" order and apply Title Case. For example, if the document says "DOE, JOHN" or "john doe", you must return "John Doe". If, and only if, no person is clearly identified, use the primary company name or a descriptive title of the document as the owner, formatted in Title Case.
+  - **Category:** Determine a broad, general category for the document. Choose from options like "Personal ID", "Financial", "Work", "Legal", "Receipt", "Travel", "Medical", or "Credential".
+  - **Tags:** Extract 2-4 specific, lowercase, single-word tags that describe the document's content. Examples: "invoice", "contract", "bank-statement", "boarding-pass", "prescription".
   - **Dates:** Find the expiration date and format it as YYYY-MM-DD. If no expiry date is present, use null.
-  - **Null Values:** If a field like 'company', 'country', or 'expiryDate' is not present on the document, you MUST return null. Do not guess or invent information.
+  - **Null Values:** If a field like 'expiryDate' is not present on the document, you MUST return null. Do not guess or invent information.
 
   Image: {{media url=documentDataUrl}}
 
