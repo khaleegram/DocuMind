@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { useRouter } from 'next/navigation';
-import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import type { Document as DocumentType } from '@/lib/types';
 import { 
@@ -42,11 +42,7 @@ export default function DashboardHomePage() {
     }
     setUserName(user.displayName?.split(' ')[0] || 'User');
     
-    const q = query(
-      collection(db, 'documents'), 
-      where('userId', '==', user.uid),
-      orderBy('uploadedAt', 'desc')
-    );
+    const q = query(collection(db, 'documents'), where('userId', '==', user.uid));
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
         const docs: DocumentType[] = [];
@@ -58,28 +54,13 @@ export default function DashboardHomePage() {
                 uploadedAt: data.uploadedAt?.toDate ? data.uploadedAt.toDate().toISOString() : new Date().toISOString(),
             } as DocumentType);
         });
-        setDocuments(docs);
-        setIsLoadingDocs(false);
-    }, (error) => {
-      console.error("Firestore snapshot error:", error);
-      // If there's an index error, try fetching without ordering
-      const qWithoutOrder = query(collection(db, 'documents'), where('userId', '==', user.uid));
-      const unsubscribeWithoutOrder = onSnapshot(qWithoutOrder, (snapshot) => {
-        const docs: DocumentType[] = [];
-        snapshot.forEach((doc) => {
-            const data = doc.data();
-            docs.push({
-                id: doc.id,
-                ...data,
-                uploadedAt: data.uploadedAt?.toDate ? data.uploadedAt.toDate().toISOString() : new Date().toISOString(),
-            } as DocumentType);
-        });
         // Manual sort on the client
         docs.sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
         setDocuments(docs);
         setIsLoadingDocs(false);
-      });
-      return () => unsubscribeWithoutOrder();
+    }, (error) => {
+      console.error("Firestore snapshot error:", error);
+      setIsLoadingDocs(false);
     });
 
     return () => unsubscribe();
