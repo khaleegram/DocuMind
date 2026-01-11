@@ -1,10 +1,10 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { useRouter } from 'next/navigation';
-import { collection, query, where, onSnapshot, limit, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import type { Document as DocumentType } from '@/lib/types';
 import { 
@@ -14,22 +14,25 @@ import {
   ArrowRight,
   Search,
   Box,
-  ChevronRight
+  ChevronRight,
+  Zap,
+  FileText,
+  Clock
 } from 'lucide-react';
 import Image from 'next/image';
 import { UploadDialog } from '@/components/dashboard/upload-dialog';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import RecentDocuments from '@/components/dashboard/recent-documents';
+import { format } from 'date-fns';
 
 export default function DashboardHomePage() {
   const [user, loadingAuth] = useAuthState(auth);
   const router = useRouter();
   const [documents, setDocuments] = useState<DocumentType[]>([]);
-  const [recentDocuments, setRecentDocuments] = useState<DocumentType[]>([]);
   const [isLoadingDocs, setIsLoadingDocs] = useState(true);
   const [isUploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [userName, setUserName] = useState('');
+  const [quickSearchQuery, setQuickSearchQuery] = useState('');
 
   useEffect(() => {
     if (loadingAuth) return;
@@ -39,68 +42,58 @@ export default function DashboardHomePage() {
     }
     setUserName(user.displayName?.split(' ')[0] || 'User');
     
-    // Query for all documents to get the total count
-    const allDocsQuery = query(collection(db, 'documents'), where('userId', '==', user.uid));
-    const unsubscribeAll = onSnapshot(allDocsQuery, (querySnapshot) => {
+    const q = query(
+      collection(db, 'documents'), 
+      where('userId', '==', user.uid),
+      orderBy('uploadedAt', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
         const docs: DocumentType[] = [];
         querySnapshot.forEach((doc) => {
             const data = doc.data();
-            docs.push({ id: doc.id, ...data } as DocumentType);
-        });
-        setDocuments(docs);
-        setIsLoadingDocs(false);
-    });
-
-    // Query for the 5 most recent documents
-    const recentDocsQuery = query(
-      collection(db, 'documents'), 
-      where('userId', '==', user.uid),
-      orderBy('uploadedAt', 'desc'),
-      limit(5)
-    );
-    const unsubscribeRecent = onSnapshot(recentDocsQuery, (querySnapshot) => {
-        const rDocs: DocumentType[] = [];
-        querySnapshot.forEach((doc) => {
-            const data = doc.data();
-            rDocs.push({
+            docs.push({
                 id: doc.id,
                 ...data,
                 uploadedAt: data.uploadedAt?.toDate ? data.uploadedAt.toDate().toISOString() : new Date().toISOString(),
             } as DocumentType);
         });
-        setRecentDocuments(rDocs);
+        setDocuments(docs);
+        setIsLoadingDocs(false);
     }, (error) => {
-        // This is the error handler for the snapshot listener.
-        // It's likely the composite index is missing.
-        console.error("Firestore error fetching recent documents:", error);
-        
-        // As a fallback, fetch without ordering and sort on the client.
-        const fallbackQuery = query(
-            collection(db, 'documents'),
-            where('userId', '==', user.uid),
-            limit(5)
-        );
-        onSnapshot(fallbackQuery, (snapshot) => {
-            const fallbackDocs: DocumentType[] = [];
-            snapshot.forEach((doc) => {
-                const data = doc.data();
-                fallbackDocs.push({
-                    id: doc.id,
-                    ...data,
-                    uploadedAt: data.uploadedAt?.toDate ? data.uploadedAt.toDate().toISOString() : new Date().toISOString(),
-                } as DocumentType);
-            });
-            // Sort manually on the client
-            fallbackDocs.sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
-            setRecentDocuments(fallbackDocs);
+      console.error("Firestore snapshot error:", error);
+      // If there's an index error, try fetching without ordering
+      const qWithoutOrder = query(collection(db, 'documents'), where('userId', '==', user.uid));
+      const unsubscribeWithoutOrder = onSnapshot(qWithoutOrder, (snapshot) => {
+        const docs: DocumentType[] = [];
+        snapshot.forEach((doc) => {
+            const data = doc.data();
+            docs.push({
+                id: doc.id,
+                ...data,
+                uploadedAt: data.uploadedAt?.toDate ? data.uploadedAt.toDate().toISOString() : new Date().toISOString(),
+            } as DocumentType);
         });
+        // Manual sort on the client
+        docs.sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
+        setDocuments(docs);
+        setIsLoadingDocs(false);
+      });
+      return () => unsubscribeWithoutOrder();
     });
 
-    return () => {
-      unsubscribeAll();
-      unsubscribeRecent();
-    }
+    return () => unsubscribe();
   }, [user, loadingAuth, router]);
+
+  const topDocuments = useMemo(() => documents.slice(0, 5), [documents]);
+
+  const handleQuickSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (quickSearchQuery.trim()) {
+      router.push(`/dashboard/documents?q=${encodeURIComponent(quickSearchQuery)}`);
+    }
+  };
+
 
   if (loadingAuth || isLoadingDocs) {
     return (
@@ -113,13 +106,12 @@ export default function DashboardHomePage() {
   return (
     <div className="min-h-screen bg-[#050505] text-white font-sans selection:bg-blue-500/40">
       
-      {/* --- DUAL ISLAND SYSTEM --- */}
+      {/* --- TRIPLE ISLAND HEADER --- */}
       <div className="fixed top-6 left-0 right-0 z-50 flex items-center justify-between px-8 pointer-events-none">
-        
-        {/* LEFT ISLAND: APP ICON */}
+        {/* LEFT: BRAND */}
         <div className="pointer-events-auto bg-[#111113] border border-white/10 p-2 rounded-2xl shadow-2xl flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
-              <Image src="/icon.png" alt="DocuMind Logo" width={28} height={28} />
+              <Image src="/logo.png" alt="DocuMind Logo" width={24} height={24} />
             </div>
             <div className="pr-3 hidden md:block">
                 <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-bold leading-none mb-1">Secure</p>
@@ -127,7 +119,7 @@ export default function DashboardHomePage() {
             </div>
         </div>
 
-        {/* CENTER ISLAND: ACTIONS */}
+        {/* CENTER: ACTIONS */}
         <div className="absolute left-1/2 -translate-x-1/2 pointer-events-auto flex items-center bg-[#111113]/90 backdrop-blur-xl border border-white/10 p-1.5 rounded-[1.2rem] shadow-2xl">
           <button 
             onClick={() => setUploadDialogOpen(true)}
@@ -138,20 +130,25 @@ export default function DashboardHomePage() {
           </button>
         </div>
 
-        {/* SPACER FOR SYMMETRY */}
-        <div className="w-[120px] hidden md:block"></div>
+        {/* RIGHT: SEARCH WITH GLOW */}
+        <form onSubmit={handleQuickSearchSubmit} className="pointer-events-auto flex items-center bg-[#111113]/90 backdrop-blur-xl border border-white/10 p-1.5 rounded-2xl shadow-[0_0_20px_rgba(37,99,235,0.1)] transition-all focus-within:shadow-[0_0_30px_rgba(37,99,235,0.25)] focus-within:border-blue-500/40">
+           <Search size={16} className="ml-3 text-zinc-600" />
+           <input 
+              type="text" 
+              placeholder="Quick search..."
+              value={quickSearchQuery}
+              onChange={(e) => setQuickSearchQuery(e.target.value)}
+              className="bg-transparent border-none outline-none px-3 py-1.5 text-xs font-medium w-32 md:w-48 placeholder:text-zinc-700"
+           />
+        </form>
       </div>
 
-      <main className="max-w-4xl mx-auto px-6 pt-40 pb-20">
+      <main className="max-w-4xl mx-auto px-6 pt-40 pb-20 space-y-8">
         
-        {/* --- HEADER --- */}
-        <div className="mb-16 space-y-4">
+        {/* --- HERO --- */}
+        <div className="mb-12 space-y-4">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold uppercase tracking-widest">
-                <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
-                </span>
-                System Active
+                <Zap size={14} className="fill-blue-400" /> System Active
             </div>
             <h1 className="text-6xl font-black tracking-tighter">
                 Welcome, <br/>
@@ -159,9 +156,40 @@ export default function DashboardHomePage() {
             </h1>
         </div>
 
-        {/* --- MAIN DASHBOARD CARD --- */}
-        <div className="relative group mb-16">
-            {/* Ambient Background Glow */}
+        {/* --- TOP 5 LIST --- */}
+        <Card className="bg-[#0C0C0E] border-white/5 rounded-[2.5rem] overflow-hidden border-t-white/10 shadow-2xl">
+          <CardHeader className="p-8 pb-4">
+            <div className="flex items-center gap-3">
+              <Clock className="text-blue-500" size={20} />
+              <CardTitle className="text-xl font-black uppercase tracking-tight">Recent Intelligence</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="px-8 pb-8 space-y-2">
+              {topDocuments.map((doc) => (
+                <div 
+                  key={doc.id}
+                  onClick={() => router.push(`/dashboard/document/${doc.id}`)}
+                  className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] transition-all cursor-pointer group"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="text-zinc-600 group-hover:text-blue-500 transition-colors">
+                      {doc.isProcessing ? <Loader2 className="animate-spin"/> : <FileText size={20}/> }
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-zinc-200 group-hover:text-white transition-colors truncate">{doc.owner || doc.fileName}</p>
+                      <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">
+                        {doc.uploadedAt ? format(new Date(doc.uploadedAt), 'MMM dd, HH:mm') : 'Recently'}
+                      </p>
+                    </div>
+                  </div>
+                  <ChevronRight size={16} className="text-zinc-800 group-hover:text-white transition-all" />
+                </div>
+              ))}
+          </CardContent>
+        </Card>
+
+        {/* --- VAULT CARD (RESTORED DESIGN) --- */}
+        <div className="relative group">
             <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-[3rem] blur opacity-10 group-hover:opacity-20 transition duration-1000"></div>
             
             <Card className="relative bg-[#0C0C0E] border-white/5 rounded-[2.8rem] shadow-2xl overflow-hidden border-t-white/10">
@@ -184,7 +212,6 @@ export default function DashboardHomePage() {
                 
                 <CardContent className="p-10 pt-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Quick Nav 1 */}
                         <button 
                             onClick={() => router.push('/dashboard/documents')}
                             className="flex items-center justify-between p-6 bg-white/[0.03] border border-white/5 rounded-3xl hover:bg-white/[0.08] hover:border-white/10 transition-all group/btn"
@@ -201,7 +228,6 @@ export default function DashboardHomePage() {
                             <ChevronRight className="text-zinc-700 group-hover/btn:text-white transition-colors" />
                         </button>
 
-                        {/* Quick Nav 2 */}
                         <button 
                             onClick={() => router.push('/dashboard/documents')}
                             className="flex items-center justify-between p-6 bg-white/[0.03] border border-white/5 rounded-3xl hover:bg-white/[0.08] hover:border-white/10 transition-all group/btn"
@@ -229,20 +255,9 @@ export default function DashboardHomePage() {
                 </CardContent>
             </Card>
         </div>
-
-        {/* --- RECENT DOCUMENTS --- */}
-        <RecentDocuments documents={recentDocuments} />
-
       </main>
 
-      <UploadDialog 
-        isOpen={isUploadDialogOpen}
-        setIsOpen={setUploadDialogOpen}
-      />
+      <UploadDialog isOpen={isUploadDialogOpen} setIsOpen={setUploadDialogOpen} />
     </div>
   );
 }
-
-    
-
-    

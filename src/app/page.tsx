@@ -82,7 +82,7 @@ export default function LoginPage() {
         <Card className="shadow-2xl rounded-xl border-border/20 bg-card/80 backdrop-blur-sm">
           <CardHeader className="text-center p-8">
             <motion.img
-              src="/icon.png"
+              src="/logo.png"
               alt="App Icon"
               className="mx-auto h-40 w-40 object-contain mb-6"
               variants={FADE_UP_ANIMATION_VARIANTS}
