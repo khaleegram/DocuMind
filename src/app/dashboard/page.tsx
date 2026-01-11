@@ -107,50 +107,63 @@ export default function DashboardHomePage() {
     <div className="min-h-screen bg-[#050505] text-white font-sans selection:bg-blue-500/40">
       
       {/* --- TRIPLE ISLAND HEADER --- */}
-      <div className="fixed top-6 left-0 right-0 z-50 flex items-center justify-between px-8 pointer-events-none">
-        {/* LEFT: BRAND */}
-        <div className="pointer-events-auto bg-[#111113] border border-white/10 p-2 rounded-2xl shadow-2xl flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
-              <Image src="/logo.png" alt="DocuMind Logo" width={24} height={24} />
+      <header className="fixed top-0 left-0 right-0 z-50 p-4 md:top-6 md:px-8">
+        <div className="relative flex items-center justify-between gap-4 max-w-4xl mx-auto">
+            {/* LEFT: BRAND */}
+            <div className="pointer-events-auto bg-[#111113] border border-white/10 p-2 rounded-2xl shadow-2xl flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20 shrink-0">
+                  <Image src="/logo.png" alt="DocuMind Logo" width={24} height={24} />
+                </div>
+                <div className="pr-3 hidden md:block">
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-bold leading-none mb-1">Secure</p>
+                    <p className="text-sm font-black tracking-tight leading-none">VAULT OS</p>
+                </div>
             </div>
-            <div className="pr-3 hidden md:block">
-                <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-bold leading-none mb-1">Secure</p>
-                <p className="text-sm font-black tracking-tight leading-none">VAULT OS</p>
-            </div>
-        </div>
 
-        {/* CENTER: ACTIONS */}
-        <div className="absolute left-1/2 -translate-x-1/2 pointer-events-auto flex items-center bg-[#111113]/90 backdrop-blur-xl border border-white/10 p-1.5 rounded-[1.2rem] shadow-2xl">
+            {/* CENTER: ACTIONS (Desktop only) */}
+            <div className="absolute left-1/2 -translate-x-1/2 pointer-events-auto छिपे हुए md:flex items-center bg-[#111113]/90 backdrop-blur-xl border border-white/10 p-1.5 rounded-[1.2rem] shadow-2xl">
+              <button 
+                onClick={() => setUploadDialogOpen(true)}
+                className="flex items-center gap-2 bg-white text-black hover:bg-zinc-200 px-4 py-2 rounded-[0.9rem] text-xs font-bold transition-all active:scale-95 shadow-lg"
+              >
+                <Plus size={16} strokeWidth={3} />
+                <span>Upload New</span>
+              </button>
+            </div>
+
+            {/* RIGHT: SEARCH */}
+            <form onSubmit={handleQuickSearchSubmit} className="pointer-events-auto flex items-center bg-[#111113]/90 backdrop-blur-xl border border-white/10 p-1.5 rounded-2xl shadow-[0_0_20px_rgba(37,99,235,0.1)] transition-all focus-within:shadow-[0_0_30px_rgba(37,99,235,0.25)] focus-within:border-blue-500/40 w-full max-w-xs sm:w-auto">
+               <Search size={16} className="ml-3 text-zinc-600" />
+               <input 
+                  type="text" 
+                  placeholder="Quick search..."
+                  value={quickSearchQuery}
+                  onChange={(e) => setQuickSearchQuery(e.target.value)}
+                  className="bg-transparent border-none outline-none px-3 py-1.5 text-xs font-medium w-full placeholder:text-zinc-700"
+               />
+            </form>
+        </div>
+      </header>
+
+      {/* --- FLOATING ACTION BUTTON (Mobile only) --- */}
+      <div className="fixed bottom-6 right-6 z-50 md:hidden">
           <button 
             onClick={() => setUploadDialogOpen(true)}
-            className="flex items-center gap-2 bg-white text-black hover:bg-zinc-200 px-4 py-2 rounded-[0.9rem] text-xs font-bold transition-all active:scale-95 shadow-lg"
+            className="flex items-center justify-center w-14 h-14 bg-white rounded-full shadow-2xl shadow-black/40 text-black active:scale-95 transition-transform"
           >
-            <Plus size={16} strokeWidth={3} />
-            <span>Upload New</span>
+            <Plus size={24} strokeWidth={3} />
           </button>
-        </div>
-
-        {/* RIGHT: SEARCH WITH GLOW */}
-        <form onSubmit={handleQuickSearchSubmit} className="pointer-events-auto flex items-center bg-[#111113]/90 backdrop-blur-xl border border-white/10 p-1.5 rounded-2xl shadow-[0_0_20px_rgba(37,99,235,0.1)] transition-all focus-within:shadow-[0_0_30px_rgba(37,99,235,0.25)] focus-within:border-blue-500/40">
-           <Search size={16} className="ml-3 text-zinc-600" />
-           <input 
-              type="text" 
-              placeholder="Quick search..."
-              value={quickSearchQuery}
-              onChange={(e) => setQuickSearchQuery(e.target.value)}
-              className="bg-transparent border-none outline-none px-3 py-1.5 text-xs font-medium w-32 md:w-48 placeholder:text-zinc-700"
-           />
-        </form>
       </div>
 
-      <main className="max-w-4xl mx-auto px-6 pt-40 pb-20 space-y-8">
+
+      <main className="max-w-4xl mx-auto px-6 pt-32 md:pt-40 pb-20 space-y-8">
         
         {/* --- HERO --- */}
         <div className="mb-12 space-y-4">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold uppercase tracking-widest">
                 <Zap size={14} className="fill-blue-400" /> System Active
             </div>
-            <h1 className="text-6xl font-black tracking-tighter">
+            <h1 className="text-5xl md:text-6xl font-black tracking-tighter">
                 Welcome, <br/>
                 <span className="text-zinc-500">{userName}.</span>
             </h1>
@@ -171,18 +184,18 @@ export default function DashboardHomePage() {
                   onClick={() => router.push(`/dashboard/document/${doc.id}`)}
                   className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] transition-all cursor-pointer group"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="text-zinc-600 group-hover:text-blue-500 transition-colors">
+                  <div className="flex items-center gap-4 overflow-hidden">
+                    <div className="text-zinc-600 group-hover:text-blue-500 transition-colors shrink-0">
                       {doc.isProcessing ? <Loader2 className="animate-spin"/> : <FileText size={20}/> }
                     </div>
-                    <div>
+                    <div className="overflow-hidden">
                       <p className="text-sm font-bold text-zinc-200 group-hover:text-white transition-colors truncate">{doc.owner || doc.fileName}</p>
                       <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">
                         {doc.uploadedAt ? format(new Date(doc.uploadedAt), 'MMM dd, HH:mm') : 'Recently'}
                       </p>
                     </div>
                   </div>
-                  <ChevronRight size={16} className="text-zinc-800 group-hover:text-white transition-all" />
+                  <ChevronRight size={16} className="text-zinc-800 group-hover:text-white transition-all shrink-0 ml-2" />
                 </div>
               ))}
           </CardContent>
@@ -204,7 +217,7 @@ export default function DashboardHomePage() {
                         </CardDescription>
                     </div>
                     
-                    <div className="text-right">
+                    <div className="text-right shrink-0">
                         <p className="text-6xl font-black text-white tabular-nums leading-none tracking-tighter">{documents.length}</p>
                         <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-[0.2em] mt-2">Verified Files</p>
                     </div>
