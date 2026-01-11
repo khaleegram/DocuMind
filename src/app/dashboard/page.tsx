@@ -69,6 +69,31 @@ export default function DashboardHomePage() {
             } as DocumentType);
         });
         setRecentDocuments(rDocs);
+    }, (error) => {
+        // This is the error handler for the snapshot listener.
+        // It's likely the composite index is missing.
+        console.error("Firestore error fetching recent documents:", error);
+        
+        // As a fallback, fetch without ordering and sort on the client.
+        const fallbackQuery = query(
+            collection(db, 'documents'),
+            where('userId', '==', user.uid),
+            limit(5)
+        );
+        onSnapshot(fallbackQuery, (snapshot) => {
+            const fallbackDocs: DocumentType[] = [];
+            snapshot.forEach((doc) => {
+                const data = doc.data();
+                fallbackDocs.push({
+                    id: doc.id,
+                    ...data,
+                    uploadedAt: data.uploadedAt?.toDate ? data.uploadedAt.toDate().toISOString() : new Date().toISOString(),
+                } as DocumentType);
+            });
+            // Sort manually on the client
+            fallbackDocs.sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
+            setRecentDocuments(fallbackDocs);
+        });
     });
 
     return () => {
@@ -217,5 +242,7 @@ export default function DashboardHomePage() {
     </div>
   );
 }
+
+    
 
     
