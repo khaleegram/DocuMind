@@ -1,14 +1,19 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
     match /documents/{docId} {
-      // Allow users to create documents if the document's userId matches their own.
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      
-      // Allow users to read, update, or delete their own documents.
-      allow read, update, delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.fileName is string
+        && request.resource.data.storagePath is string;
+
+      allow read, delete: if request.auth != null
+        && resource.data.userId == request.auth.uid;
+
+      allow update: if request.auth != null
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid;
     }
   }
 }
