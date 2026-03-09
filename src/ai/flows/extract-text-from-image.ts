@@ -1,8 +1,8 @@
 'use server';
 /**
- * @fileOverview A Genkit flow to extract text content from an image.
+ * @fileOverview A Genkit flow to extract text content from a document file.
  *
- * - extractTextFromImage - A function that takes an image data URI and returns the text.
+ * - extractTextFromImage - A function that takes a document data URI and returns the text.
  * - ExtractTextFromImageInput - The input type for the extractTextFromImage function.
  * - ExtractTextFromImageOutput - The return type for the extractTextFromImage function.
  */
@@ -11,7 +11,7 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const ExtractTextFromImageInputSchema = z.object({
-  documentDataUrl: z.string().describe('A data URI of an image of the document.'),
+  documentDataUrl: z.string().describe('A data URI of a document (image or PDF).'),
 });
 export type ExtractTextFromImageInput = z.infer<typeof ExtractTextFromImageInputSchema>;
 
@@ -28,9 +28,9 @@ const prompt = ai.definePrompt({
   name: 'extractTextFromImagePrompt',
   input: {schema: ExtractTextFromImageInputSchema},
   output: {schema: ExtractTextFromImageOutputSchema},
-  prompt: `Extract all text from the following image.
+  prompt: `Extract all text from the following document.
 
-Image: {{media url=documentDataUrl}}
+Document: {{media url=documentDataUrl}}
 `,
 });
 

@@ -24,7 +24,7 @@ export type ExtractDocumentMetadataInput = z.infer<
 const ExtractDocumentMetadataOutputSchema = z.object({
   owner: z.string().describe('The full name of the primary person on the document, formatted as "Firstname Lastname". If no person is present, use the primary company name or a descriptive title, formatted in Title Case.'),
   category: z.string().describe('The general category of the document (e.g., "Personal ID", "Financial", "Work", "Legal", "Receipt"), formatted in Title Case.'),
-  expiryDate: z.string().nullable().describe('The expiration date of the document in YYYY-MM-DD format, or null if not found.'),
+  expiry: z.string().nullable().describe('The expiration date of the document in YYYY-MM-DD format, or null if not found.'),
   tags: z.array(z.string()).describe('A list of 2-4 specific, relevant tags for organization (e.g., "contract", "invoice", "bank-statement").'),
   keywords: z.array(z.string()).describe('A list of 3-5 relevant keywords for search.'),
   summary: z.string().describe("A concise, one-to-two sentence summary of the document's content."),
@@ -52,7 +52,7 @@ const prompt = ai.definePrompt({
   - **Category:** Determine a broad, general category for the document. Choose from options like "Personal ID", "Financial", "Work", "Legal", "Receipt", "Travel", "Medical", or "Credential".
   - **Tags:** Extract 2-4 specific, lowercase, single-word tags that describe the document's content. Examples: "invoice", "contract", "bank-statement", "boarding-pass", "prescription".
   - **Dates:** Find the expiration date and format it as YYYY-MM-DD. If no expiry date is present, use null.
-  - **Null Values:** If a field like 'expiryDate' is not present on the document, you MUST return null. Do not guess or invent information.
+  - **Null Values:** If a field like 'expiry' is not present on the document, you MUST return null. Do not guess or invent information.
 
   Image: {{media url=documentDataUrl}}
 
