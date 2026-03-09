@@ -167,7 +167,11 @@ export default function Header({
 
   const RightContent = () => (
     <div className="flex items-center gap-2 md:gap-4">
-       {showSearch && onSearchSubmit && setSearchQuery && (
+       {showAiSearch && onAiSearch ? (
+        <div className="hidden md:block w-[360px]">
+          <AiSearchAgent onAiSearch={onAiSearch} isSearching={isAiSearching} initialQuery={searchQuery} />
+        </div>
+      ) : showSearch && onSearchSubmit && setSearchQuery ? (
          <form onSubmit={handleFormSubmit} className="relative hidden md:block">
             <Input
                 type="search"
@@ -188,7 +192,7 @@ export default function Header({
                 <Search className="h-4 w-4" />
             </Button>
         </form>
-      )}
+      ) : null}
 
       <button 
         onClick={() => setMobileSearchOpen(p => !p)}

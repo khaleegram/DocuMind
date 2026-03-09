@@ -47,7 +47,7 @@ export default function ExpiringSoonList({ documents }: ExpiringSoonListProps) {
                 <div className="flex-1 grid grid-cols-3 gap-4 items-center">
                    <div className="flex items-center gap-2 truncate">
                         <FileText className="h-4 w-4 text-muted-foreground shrink-0"/>
-                        <span className="font-semibold truncate">{doc.type}</span>
+                        <span className="font-semibold truncate">{doc.category}</span>
                     </div>
                     <div className="flex items-center gap-2 truncate">
                         <User className="h-4 w-4 text-muted-foreground shrink-0" />

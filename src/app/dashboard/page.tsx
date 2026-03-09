@@ -4,9 +4,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { useRouter } from 'next/navigation';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import type { Document as DocumentType } from '@/lib/types';
+import { parseDocumentFromFirestore } from '@/lib/types';
 import { 
   Loader2, 
   Files, 
@@ -42,20 +43,22 @@ export default function DashboardHomePage() {
     }
     setUserName(user.displayName?.split(' ')[0] || 'User');
     
-    const q = query(collection(db, 'documents'), where('userId', '==', user.uid));
+    const q = query(
+      collection(db, 'documents'),
+      where('userId', '==', user.uid),
+      orderBy('uploadedAt', 'desc'),
+      limit(20)
+    );
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
         const docs: DocumentType[] = [];
         querySnapshot.forEach((doc) => {
-            const data = doc.data();
-            docs.push({
-                id: doc.id,
-                ...data,
-                uploadedAt: data.uploadedAt?.toDate ? data.uploadedAt.toDate().toISOString() : new Date().toISOString(),
-            } as DocumentType);
+            try {
+              docs.push(parseDocumentFromFirestore(doc.id, doc.data() as Record<string, unknown>));
+            } catch (error) {
+              console.error(`Skipping invalid document ${doc.id}:`, error);
+            }
         });
-        // Manual sort on the client
-        docs.sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
         setDocuments(docs);
         setIsLoadingDocs(false);
     }, (error) => {

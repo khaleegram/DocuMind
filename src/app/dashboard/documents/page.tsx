@@ -1,44 +1,64 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import type { Document as DocumentType } from '@/lib/types';
+import { parseDocumentFromFirestore } from '@/lib/types';
 import Header from '@/components/dashboard/header';
 import DocumentList from '@/components/dashboard/document-list';
 import { UploadDialog } from '@/components/dashboard/upload-dialog';
-import { auth, db, storage } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { useRouter } from 'next/navigation';
-import { collection, query, where, onSnapshot, deleteDoc, doc, getDoc } from 'firebase/firestore';
-import { deleteObject, ref } from 'firebase/storage';
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  orderBy,
+  limit,
+  startAfter,
+  type QueryConstraint,
+  type QueryDocumentSnapshot,
+  type DocumentData,
+} from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import FilterSidebar from '@/components/dashboard/filter-sidebar';
 import Fuse from 'fuse.js';
 import { EmptyState } from '@/components/dashboard/empty-state';
-import { intelligentSearch } from '@/ai/flows/intelligent-search';
+import { Button } from '@/components/ui/button';
+import { AI_SEARCH_MAX_DOCUMENTS, DEFAULT_PAGE_SIZE } from '@/lib/constants';
 
 export type FilterCategory = 'category' | 'tags';
 
-// Function to find the canonical name for a given value
 const findCanonicalName = (value: string, existingNames: Set<string>): string => {
-    if (existingNames.has(value)) {
-        return value;
-    }
-    const fuse = new Fuse(Array.from(existingNames), { threshold: 0.2, ignoreLocation: true });
-    const results = fuse.search(value);
-    if (results.length > 0) {
-        return results[0].item;
-    }
+  if (existingNames.has(value)) {
     return value;
+  }
+  const fuse = new Fuse(Array.from(existingNames), { threshold: 0.2, ignoreLocation: true });
+  const results = fuse.search(value);
+  if (results.length > 0) {
+    return results[0].item;
+  }
+  return value;
 };
 
+const dedupeDocumentsById = (docs: DocumentType[]): DocumentType[] => {
+  const map = new Map<string, DocumentType>();
+  docs.forEach(item => map.set(item.id, item));
+  return Array.from(map.values()).sort(
+    (a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+  );
+};
 
 export default function AllDocumentsPage() {
   const [user, loading] = useAuthState(auth);
   const router = useRouter();
   const [documents, setDocuments] = useState<DocumentType[]>([]);
   const [isLoadingDocs, setIsLoadingDocs] = useState(true);
+  const [isLoadingMoreDocs, setIsLoadingMoreDocs] = useState(false);
+  const [hasMoreDocs, setHasMoreDocs] = useState(false);
+  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [submittedSearchQuery, setSubmittedSearchQuery] = useState('');
   const [isUploadDialogOpen, setUploadDialogOpen] = useState(false);
@@ -50,6 +70,62 @@ export default function AllDocumentsPage() {
   });
   const { toast } = useToast();
 
+  const fetchDocumentsPage = useCallback(
+    async (options: {
+      reset: boolean;
+      cursor?: QueryDocumentSnapshot<DocumentData> | null;
+    }) => {
+      if (!user) return;
+
+      if (options.reset) {
+        setIsLoadingDocs(true);
+      } else {
+        setIsLoadingMoreDocs(true);
+      }
+
+      try {
+        const constraints: QueryConstraint[] = [
+          where('userId', '==', user.uid),
+          orderBy('uploadedAt', 'desc'),
+          limit(DEFAULT_PAGE_SIZE),
+        ];
+
+        if (!options.reset && options.cursor) {
+          constraints.push(startAfter(options.cursor));
+        }
+
+        const q = query(collection(db, 'documents'), ...constraints);
+        const snapshot = await getDocs(q);
+
+        const parsedDocuments = snapshot.docs.flatMap(item => {
+          try {
+            return [parseDocumentFromFirestore(item.id, item.data() as Record<string, unknown>)];
+          } catch (error) {
+            console.error(`Skipping invalid document ${item.id}:`, error);
+            return [];
+          }
+        });
+
+        setDocuments(prev =>
+          options.reset ? dedupeDocumentsById(parsedDocuments) : dedupeDocumentsById([...prev, ...parsedDocuments])
+        );
+        setLastDoc(snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : null);
+        setHasMoreDocs(snapshot.docs.length === DEFAULT_PAGE_SIZE);
+      } catch (error) {
+        console.error('Error fetching documents:', error);
+        toast({
+          variant: 'destructive',
+          title: 'LOAD_FAILED',
+          description: 'Could not fetch documents. Please retry.',
+        });
+      } finally {
+        setIsLoadingDocs(false);
+        setIsLoadingMoreDocs(false);
+      }
+    },
+    [user, toast]
+  );
+
   useEffect(() => {
     if (loading) return;
     if (!user) {
@@ -57,59 +133,42 @@ export default function AllDocumentsPage() {
       return;
     }
 
-    setIsLoadingDocs(true);
-    const q = query(collection(db, 'documents'), where('userId', '==', user.uid));
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-        const docs: DocumentType[] = [];
-        querySnapshot.forEach((doc) => {
-            const data = doc.data();
-            docs.push({
-                id: doc.id,
-                ...data,
-                uploadedAt: data.uploadedAt?.toDate ? data.uploadedAt.toDate().toISOString() : new Date().toISOString(),
-            } as DocumentType);
-        });
-        setDocuments(docs.sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()));
-        setIsLoadingDocs(false);
-    });
-
-    return () => unsubscribe();
-}, [user, loading, router]);
-
+    void fetchDocumentsPage({ reset: true });
+  }, [user, loading, router, fetchDocumentsPage]);
 
   const filterOptions = useMemo(() => {
     const options: Record<FilterCategory, Set<string>> = {
       category: new Set(),
       tags: new Set(),
     };
-    documents.forEach(doc => {
-      if (doc.category && doc.category !== 'Processing...') {
-          const canonicalCategory = findCanonicalName(doc.category, options.category);
-          options.category.add(canonicalCategory);
+    documents.forEach(docItem => {
+      if (docItem.category && docItem.category !== 'Processing...') {
+        const canonicalCategory = findCanonicalName(docItem.category, options.category);
+        options.category.add(canonicalCategory);
       }
-      if (doc.tags && Array.isArray(doc.tags)) {
-        doc.tags.forEach(tag => {
-            const canonicalTag = findCanonicalName(tag, options.tags);
-            options.tags.add(canonicalTag);
+      if (docItem.tags && Array.isArray(docItem.tags)) {
+        docItem.tags.forEach(tag => {
+          const canonicalTag = findCanonicalName(tag, options.tags);
+          options.tags.add(canonicalTag);
         });
       }
     });
     return {
-        category: Array.from(options.category).sort(),
-        tags: Array.from(options.tags).sort(),
-    }
+      category: Array.from(options.category).sort(),
+      tags: Array.from(options.tags).sort(),
+    };
   }, [documents]);
 
   const handleFilterChange = useCallback((category: FilterCategory, value: string) => {
-    setAiSearchResults(null); // Clear AI results when manual filters change
+    setAiSearchResults(null);
     setActiveFilters(prev => {
-        const newSet = new Set(prev[category]);
-        if (newSet.has(value)) {
-            newSet.delete(value);
-        } else {
-            newSet.add(value);
-        }
-        return { ...prev, [category]: newSet };
+      const newSet = new Set(prev[category]);
+      if (newSet.has(value)) {
+        newSet.delete(value);
+      } else {
+        newSet.add(value);
+      }
+      return { ...prev, [category]: newSet };
     });
   }, []);
 
@@ -119,137 +178,160 @@ export default function AllDocumentsPage() {
     setSearchQuery('');
     setSubmittedSearchQuery('');
   }, []);
-  
- const handleAiSearch = useCallback(async (searchString: string) => {
-    setIsAiSearching(true);
-    // Clear manual filters and search to avoid confusion
-    clearFilters();
-    setSearchQuery(searchString); // Put the query in the search bar for context
 
-    try {
-      const documentsToSearch = documents.map(doc => ({
-        id: doc.id,
-        owner: doc.owner,
-        category: doc.category,
-        tags: doc.tags,
-        summary: doc.summary ?? null,
-        keywords: doc.keywords,
-      }));
+  const handleAiSearch = useCallback(
+    async (searchString: string) => {
+      if (!user) return;
 
-      const { documentIds } = await intelligentSearch({
-        query: searchString,
-        documents: documentsToSearch,
-      });
+      setIsAiSearching(true);
+      clearFilters();
+      setSearchQuery(searchString);
 
-      const resultsMap = new Map(documents.map(doc => [doc.id, doc]));
-      const matchedDocs = documentIds.map(id => resultsMap.get(id)).filter(Boolean) as DocumentType[];
-      setAiSearchResults(matchedDocs);
+      try {
+        const idToken = await user.getIdToken();
 
-    } catch (error) {
-        console.error("AI search failed:", error);
-        toast({
-            variant: 'destructive',
-            title: 'AI Search Failed',
-            description: 'Could not perform the intelligent search. Please try again later.'
+        let candidateDocuments = documents;
+        if (documents.length > AI_SEARCH_MAX_DOCUMENTS) {
+          const preFilter = new Fuse(documents, {
+            keys: ['owner', 'category', 'tags', 'keywords', 'summary'],
+            threshold: 0.5,
+            ignoreLocation: true,
+          });
+          const ranked = preFilter.search(searchString, { limit: AI_SEARCH_MAX_DOCUMENTS }).map(item => item.item);
+          candidateDocuments = ranked.length > 0 ? ranked : documents.slice(0, AI_SEARCH_MAX_DOCUMENTS);
+        }
+
+        const documentsToSearch = candidateDocuments.map(docItem => ({
+          id: docItem.id,
+          owner: docItem.owner,
+          category: docItem.category,
+          tags: docItem.tags,
+          summary: docItem.summary ?? null,
+          keywords: docItem.keywords,
+        }));
+
+        const response = await fetch('/api/ai/search', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({
+            query: searchString,
+            documents: documentsToSearch,
+          }),
         });
-        setAiSearchResults([]); // Show empty state on error
-    } finally {
-        setIsAiSearching(false);
-    }
-  }, [documents, toast, clearFilters]);
 
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => ({}))) as { error?: string };
+          throw new Error(payload.error || 'AI search request failed.');
+        }
+
+        const { documentIds } = (await response.json()) as { documentIds: string[] };
+        const resultsMap = new Map(documents.map(docItem => [docItem.id, docItem]));
+        const matchedDocs = documentIds
+          .map(id => resultsMap.get(id))
+          .filter((item): item is DocumentType => Boolean(item));
+        setAiSearchResults(matchedDocs);
+      } catch (error) {
+        console.error('AI search failed:', error);
+        toast({
+          variant: 'destructive',
+          title: 'AI_SEARCH_FAILED',
+          description: error instanceof Error ? error.message : 'Could not perform AI search.',
+        });
+        setAiSearchResults([]);
+      } finally {
+        setIsAiSearching(false);
+      }
+    },
+    [user, clearFilters, documents, toast]
+  );
 
   const handleDeleteDocument = async (docId: string) => {
     if (!user) return;
-    
+
     try {
-      const docRef = doc(db, 'documents', docId);
-      const docSnap = await getDoc(docRef);
-
-      if (!docSnap.exists()) {
-        throw new Error("Document not found in the database.");
-      }
-      const docToDelete = docSnap.data() as DocumentType;
-
-      // Delete from Firebase Storage first
-      if (docToDelete.storagePath) {
-        const fileRef = ref(storage, docToDelete.storagePath);
-        await deleteObject(fileRef);
-      }
-
-      // Then delete from Firestore
-      await deleteDoc(docRef);
-
-      toast({
-        title: 'Document Deleted',
-        description: `${docToDelete.fileName} has been removed.`,
+      const idToken = await user.getIdToken();
+      const response = await fetch('/api/documents/delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ docId }),
       });
 
-    } catch (error: any) {
-      console.error("Error deleting document: ", error);
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(payload.error || 'Delete request failed.');
+      }
+
+      const docToDelete = documents.find(item => item.id === docId);
+      setDocuments(prev => prev.filter(item => item.id !== docId));
+      setAiSearchResults(prev => (prev ? prev.filter(item => item.id !== docId) : prev));
+
+      toast({
+        title: 'DOCUMENT_DELETED',
+        description: `${docToDelete?.fileName || 'Document'} has been removed.`,
+      });
+    } catch (error) {
+      console.error('Error deleting document:', error);
       toast({
         variant: 'destructive',
-        title: 'Deletion Failed',
-        description: error.message || 'Could not delete the document.',
+        title: 'DELETION_FAILED',
+        description: error instanceof Error ? error.message : 'Could not delete the document.',
       });
     }
   };
 
-
   const handleSearchSubmit = () => {
-    setAiSearchResults(null); // Clear AI results on manual search
-    setSubmittedSearchQuery(searchQuery);
+    setAiSearchResults(null);
+    setSubmittedSearchQuery(searchQuery.trim());
   };
-  
+
   const displayedDocuments = useMemo(() => {
-    // If there are AI search results, show them.
     if (aiSearchResults !== null) {
       return aiSearchResults;
     }
 
     let filtered = documents;
-    
-    // Apply sidebar filters with fuzzy matching for document values
-    const hasActiveFilters = Object.values(activeFilters).some(s => s.size > 0);
+    const hasActiveFilters = Object.values(activeFilters).some(filterSet => filterSet.size > 0);
 
     if (hasActiveFilters) {
-        filtered = filtered.filter(doc => {
-            return Object.entries(activeFilters).every(([category, values]) => {
-                if (values.size === 0) return true;
-                const cat = category as FilterCategory;
-                const docValue = doc[cat];
-                
-                if (cat === 'tags') {
-                    if (!Array.isArray(docValue) || docValue.length === 0) return false;
-                    // Check if any of the document's tags fuzzily match any of the selected filter tags
-                    return Array.from(values).some(filterTag => {
-                        const fuse = new Fuse(docValue, { threshold: 0.2, ignoreLocation: true });
-                        return fuse.search(filterTag).length > 0;
-                    });
-                }
+      filtered = filtered.filter(docItem =>
+        Object.entries(activeFilters).every(([category, values]) => {
+          if (values.size === 0) return true;
+          const cat = category as FilterCategory;
+          const docValue = docItem[cat];
 
-                if (!docValue) return false;
-
-                // Check if the doc's value fuzzily matches any of the selected canonical filter values
-                const fuse = new Fuse(Array.from(values), { threshold: 0.2, ignoreLocation: true });
-                return fuse.search(docValue).length > 0;
+          if (cat === 'tags') {
+            if (!Array.isArray(docValue) || docValue.length === 0) return false;
+            return Array.from(values).some(filterTag => {
+              const fuse = new Fuse(docValue, { threshold: 0.2, ignoreLocation: true });
+              return fuse.search(filterTag).length > 0;
             });
-        });
+          }
+
+          if (!docValue) return false;
+          if (typeof docValue !== 'string') return false;
+          const fuse = new Fuse(Array.from(values), { threshold: 0.2, ignoreLocation: true });
+          return fuse.search(docValue).length > 0;
+        })
+      );
     }
 
-    // Apply fuzzy search on top of filters
     if (submittedSearchQuery) {
-        const fuse = new Fuse(filtered, {
-            keys: ['owner', 'category', 'tags', 'keywords', 'summary', 'textContent'],
-            threshold: 0.4, 
-            includeScore: true,
-        });
-        filtered = fuse.search(submittedSearchQuery).map(result => result.item);
+      const fuse = new Fuse(filtered, {
+        keys: ['owner', 'category', 'tags', 'keywords', 'summary', 'fileName'],
+        threshold: 0.4,
+        includeScore: true,
+      });
+      filtered = fuse.search(submittedSearchQuery).map(result => result.item);
     }
 
     return filtered;
   }, [documents, submittedSearchQuery, activeFilters, aiSearchResults]);
-
 
   if (loading || (!user && !loading)) {
     return (
@@ -258,14 +340,22 @@ export default function AllDocumentsPage() {
       </div>
     );
   }
-  
-  const showLoader = isLoadingDocs || isAiSearching;
-  const showEmptyState = (displayedDocuments.length === 0 && (submittedSearchQuery.length > 0 || aiSearchResults !== null)) || (documents.length === 0 && !isLoadingDocs);
 
+  const showLoader = isLoadingDocs || isAiSearching;
+  const showEmptyState =
+    (displayedDocuments.length === 0 && (submittedSearchQuery.length > 0 || aiSearchResults !== null)) ||
+    (documents.length === 0 && !isLoadingDocs);
+  const hasActiveManualFilters = Object.values(activeFilters).some(filterSet => filterSet.size > 0);
+  const shouldShowLoadMore =
+    hasMoreDocs &&
+    !showLoader &&
+    !hasActiveManualFilters &&
+    aiSearchResults === null &&
+    submittedSearchQuery.length === 0;
 
   return (
     <div className="flex flex-col min-h-screen bg-[#050505] text-white font-sans selection:bg-blue-500/40">
-      <Header 
+      <Header
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
         onSearchSubmit={handleSearchSubmit}
@@ -276,26 +366,53 @@ export default function AllDocumentsPage() {
         showAiSearch={true}
       />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 max-w-7xl mx-auto w-full">
-          {showLoader ? (
-            <div className="flex items-center justify-center pt-20">
-              <Loader2 className="h-16 w-16 animate-spin text-blue-600" />
-            </div>
-          ) : (
-             showEmptyState
-             ? <EmptyState onClear={clearFilters} isFiltered={aiSearchResults !== null || submittedSearchQuery.length > 0}/> 
-             : <DocumentList documents={displayedDocuments} onDelete={handleDeleteDocument} />
-          )}
-        </main>
-      <FilterSidebar 
+        {showLoader ? (
+          <div className="flex items-center justify-center pt-20">
+            <Loader2 className="h-16 w-16 animate-spin text-blue-600" />
+          </div>
+        ) : showEmptyState ? (
+          <EmptyState
+            onClear={clearFilters}
+            isFiltered={aiSearchResults !== null || submittedSearchQuery.length > 0}
+          />
+        ) : (
+          <>
+            <DocumentList documents={displayedDocuments} onDelete={handleDeleteDocument} />
+            {shouldShowLoadMore && (
+              <div className="mt-8 flex justify-center">
+                <Button
+                  onClick={() => void fetchDocumentsPage({ reset: false, cursor: lastDoc })}
+                  disabled={isLoadingMoreDocs}
+                  variant="outline"
+                  className="bg-white/5 border-white/10 hover:bg-white/10 text-zinc-300 hover:text-white rounded-xl"
+                >
+                  {isLoadingMoreDocs ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Loading...
+                    </>
+                  ) : (
+                    'Load More Documents'
+                  )}
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+      </main>
+      <FilterSidebar
         filterOptions={filterOptions}
         activeFilters={activeFilters}
         onFilterChange={handleFilterChange}
         onClearFilters={clearFilters}
         isAiSearchActive={aiSearchResults !== null}
       />
-      <UploadDialog 
+      <UploadDialog
         isOpen={isUploadDialogOpen}
         setIsOpen={setUploadDialogOpen}
+        onUploadComplete={() => {
+          void fetchDocumentsPage({ reset: true });
+        }}
       />
     </div>
   );

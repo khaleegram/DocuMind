@@ -43,7 +43,7 @@ export default function LoginPage() {
     try {
       await signInWithPopup(auth, googleProvider);
       router.push('/dashboard');
-    } catch (error: any) {
+    } catch {
       toast({
         variant: 'destructive',
         title: 'AUTH_ERROR',

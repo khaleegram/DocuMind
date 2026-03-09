@@ -7,7 +7,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { FileText, Calendar, Tag, MoreVertical, Link as LinkIcon, Trash2, Loader2, MessageSquare, FileImage, FileType, ChevronDown, Folder } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { format, parseISO } from 'date-fns';
+import { format, isValid, parseISO } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useState } from 'react';
@@ -63,6 +63,8 @@ export function DocumentCard({ document, onDelete }: { document: Document, onDel
   };
   
   const tagsToShow = document.tags?.slice(0, 3) || [];
+  const parsedExpiry = document.expiry ? parseISO(document.expiry) : null;
+  const shouldShowExpiry = Boolean(parsedExpiry && isValid(parsedExpiry));
 
   return (
     <div 
@@ -79,10 +81,10 @@ export function DocumentCard({ document, onDelete }: { document: Document, onDel
             <Folder className="h-4 w-4 shrink-0" />
             <span className="truncate">{document.category}</span>
           </div>
-          {document.expiry && (
+          {shouldShowExpiry && parsedExpiry && (
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 shrink-0" />
-              <span>Expires: {format(parseISO(document.expiry), 'MMM dd, yyyy')}</span>
+              <span>Expires: {format(parsedExpiry, 'MMM dd, yyyy')}</span>
             </div>
           )}
         </div>

@@ -1,6 +1,5 @@
 import type { Document } from '@/lib/types';
 import { DocumentCard } from '@/components/dashboard/document-card';
-import { EmptyState } from '@/components/dashboard/empty-state';
 
 type DocumentListProps = {
   documents: Document[];

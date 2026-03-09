@@ -35,7 +35,7 @@ export default function RecentDocuments({ documents }: RecentDocumentsProps) {
                     </div>
                     <div>
                         <p className="font-bold text-white truncate">{doc.owner || doc.fileName}</p>
-                        <p className="text-xs text-zinc-500 truncate">{doc.type || 'Processing...'}</p>
+                        <p className="text-xs text-zinc-500 truncate">{doc.category || 'Processing...'}</p>
                     </div>
                     <p className="text-xs text-zinc-600 font-medium justify-self-end">
                         {doc.uploadedAt ? formatDistanceToNow(new Date(doc.uploadedAt), { addSuffix: true }) : 'just now'}

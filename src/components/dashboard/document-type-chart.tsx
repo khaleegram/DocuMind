@@ -2,9 +2,6 @@
 
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
 import type { Document } from '@/lib/types';
-import { useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-
 type ChartData = {
   name: string;
   total: number;
@@ -12,7 +9,7 @@ type ChartData = {
 
 export function getChartData(documents: Document[]): ChartData[] {
     const typeCounts = documents.reduce((acc, doc) => {
-        const type = doc.type || 'Uncategorized';
+        const type = doc.category || 'Uncategorized';
         acc[type] = (acc[type] || 0) + 1;
         return acc;
     }, {} as Record<string, number>);

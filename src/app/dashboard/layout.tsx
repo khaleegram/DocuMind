@@ -3,15 +3,15 @@
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarProvider,
 } from '@/components/ui/sidebar';
-import { Files, Folder, Home, LogOut } from 'lucide-react';
+import { Files, Home } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 
 function MainSidebar() {
@@ -39,10 +39,10 @@ function MainSidebar() {
                 children: 'Dashboard',
               }}
             >
-              <a href="/dashboard">
+              <Link href="/dashboard">
                 <Home />
                 <span>Dashboard</span>
-              </a>
+              </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
            <SidebarMenuItem>
@@ -53,17 +53,14 @@ function MainSidebar() {
                 children: 'All Documents',
               }}
             >
-              <a href="/dashboard/documents">
+              <Link href="/dashboard/documents">
                 <Files />
                 <span>All Documents</span>
-              </a>
+              </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarContent>
-      <SidebarFooter>
-        {/* User profile moved to header */}
-      </SidebarFooter>
     </Sidebar>
   );
 }
