@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { motion } from 'framer-motion';
+import Image from 'next/image';
 
 const FADE_UP_ANIMATION_VARIANTS = {
   hidden: { opacity: 0, y: 20 },
@@ -68,9 +69,11 @@ export default function LoginPage() {
         className="w-full max-w-md relative z-10"
       >
         <motion.div variants={FADE_UP_ANIMATION_VARIANTS} className="flex flex-col items-center mb-8">
-            <img
+            <Image
               src="/icon.png"
               alt="DocuMind Logo"
+              width={128}
+              height={128}
               className="h-28 w-28 sm:h-32 sm:w-32 object-contain filter drop-shadow-[0_0_15px_rgba(59,130,246,0.4)]"
             />
         </motion.div>
@@ -79,7 +82,7 @@ export default function LoginPage() {
           <CardHeader className="text-center p-6 sm:p-10 pb-4">
             <motion.div variants={FADE_UP_ANIMATION_VARIANTS} className="space-y-3">
               <div className="flex justify-center mb-2">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[9px] font-black uppercase tracking-widest">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-black uppercase tracking-widest">
                   <Zap size={10} className="fill-blue-400" /> Secure Access
                 </div>
               </div>
@@ -110,10 +113,10 @@ export default function LoginPage() {
               </Button>
               
               <div className="flex items-center justify-center gap-4">
-                <div className="flex items-center gap-1.5 text-[9px] font-bold text-zinc-600 uppercase tracking-widest">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-600 uppercase tracking-widest">
                   <ShieldCheck size={12} className="text-blue-600" /> Encrypted
                 </div>
-                <div className="flex items-center gap-1.5 text-[9px] font-bold text-zinc-600 uppercase tracking-widest">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-600 uppercase tracking-widest">
                   <Lock size={12} className="text-blue-600" /> AES-256
                 </div>
               </div>
@@ -122,7 +125,7 @@ export default function LoginPage() {
         </Card>
 
         <motion.footer variants={FADE_UP_ANIMATION_VARIANTS} className="mt-8 text-center px-4">
-          <p className="text-[9px] font-black text-zinc-700 uppercase tracking-[0.2em]">
+          <p className="text-xs font-black text-zinc-700 uppercase tracking-[0.2em]">
             &copy; {new Date().getFullYear()} DocuMind Intelligence
           </p>
         </motion.footer>

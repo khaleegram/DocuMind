@@ -135,6 +135,19 @@ export default function Header({
 }: HeaderProps) {
   const [isMobileSearchOpen, setMobileSearchOpen] = useState(false);
   const router = useRouter();
+  const canShowMobileSearchToggle =
+    (showAiSearch && Boolean(onAiSearch)) || (showSearch && Boolean(onSearchSubmit) && Boolean(setSearchQuery));
+
+  useEffect(() => {
+    if (!isMobileSearchOpen) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMobileSearchOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [isMobileSearchOpen]);
 
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -149,18 +162,20 @@ export default function Header({
 
   const LeftContent = () => (
       <div className="flex items-center gap-4">
-        <div 
-          className="pointer-events-auto bg-[#111113] border border-white/10 p-2 rounded-2xl shadow-2xl flex items-center gap-3 cursor-pointer"
+        <button
+          type="button"
+          className="pointer-events-auto bg-[#111113] border border-white/10 p-2 rounded-2xl shadow-2xl flex items-center gap-3 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
           onClick={() => router.push('/dashboard')}
+          aria-label="Go to dashboard home"
         >
           <div className="w-10 h-10 flex items-center justify-center shrink-0">
             <Image src="/icon.png" alt="DocuMind Logo" width={40} height={40} />
           </div>
           <div className="pr-3 hidden md:block">
-              <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-bold leading-none mb-1">DocuMind</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-zinc-500 font-bold leading-none mb-1">DocuMind</p>
               <p className="text-sm font-black tracking-tight leading-none">VAULT OS</p>
           </div>
-        </div>
+        </button>
         <h1 className="text-2xl font-black tracking-tighter text-white hidden lg:block">{title}</h1>
       </div>
   );
@@ -194,16 +209,21 @@ export default function Header({
         </form>
       ) : null}
 
-      <button 
-        onClick={() => setMobileSearchOpen(p => !p)}
-        className="md:hidden flex items-center justify-center w-12 h-12 bg-[#111113] border border-white/10 rounded-2xl text-zinc-400 hover:text-white hover:bg-white/20 transition-colors"
-      >
-        <Search size={20} />
-      </button>
+      {canShowMobileSearchToggle && (
+        <button 
+          onClick={() => setMobileSearchOpen(p => !p)}
+          className="md:hidden flex items-center justify-center w-12 h-12 bg-[#111113] border border-white/10 rounded-2xl text-zinc-400 hover:text-white hover:bg-white/20 transition-colors"
+          aria-label={isMobileSearchOpen ? 'Close search' : 'Open search'}
+          aria-expanded={isMobileSearchOpen}
+        >
+          <Search size={20} />
+        </button>
+      )}
 
       <button 
         onClick={onUploadClick}
-        className="hidden md:flex items-center justify-center w-12 h-12 bg-white text-black rounded-2xl shadow-lg hover:bg-zinc-200 transition-all active:scale-95"
+        className="flex items-center justify-center w-12 h-12 bg-white text-black rounded-2xl shadow-lg hover:bg-zinc-200 transition-all active:scale-95"
+        aria-label="Upload documents"
       >
         <Upload size={20} strokeWidth={3} />
       </button>
@@ -214,13 +234,19 @@ export default function Header({
 
   return (
     <header className="sticky top-0 z-30 p-4 md:px-8">
-      <div className={`relative flex items-center justify-between gap-4 max-w-7xl mx-auto transition-all duration-300 ${isMobileSearchOpen ? 'opacity-0' : 'opacity-100'}`}>
+      <div
+        className={`relative flex items-center justify-between gap-4 max-w-7xl mx-auto transition-all duration-300 ${isMobileSearchOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+        aria-hidden={isMobileSearchOpen}
+      >
           <LeftContent />
           <RightContent />
       </div>
 
        {/* Mobile Search Overlay */}
-      <div className={`absolute inset-0 bg-[#050505] p-4 md:px-8 transition-all duration-300 ${isMobileSearchOpen ? 'opacity-100 z-30' : 'opacity-0 -z-10'}`}>
+      <div
+        className={`absolute inset-0 bg-[#050505] p-4 md:px-8 transition-all duration-300 ${isMobileSearchOpen ? 'opacity-100 z-30 pointer-events-auto' : 'opacity-0 -z-10 pointer-events-none'}`}
+        aria-hidden={!isMobileSearchOpen}
+      >
          <div className="flex items-center gap-2 max-w-7xl mx-auto h-full">
             {showAiSearch && onAiSearch ? (
               <AiSearchAgent onAiSearch={(q) => { onAiSearch(q); setMobileSearchOpen(false); }} isSearching={isAiSearching} initialQuery={searchQuery} />
@@ -247,7 +273,13 @@ export default function Header({
                   </Button>
               </form>
             ) : null}
-             <button onClick={() => setMobileSearchOpen(false)} className="w-12 h-12 flex items-center justify-center text-zinc-400">Cancel</button>
+             <button
+              type="button"
+              onClick={() => setMobileSearchOpen(false)}
+              className="h-12 px-3 rounded-xl flex items-center justify-center text-zinc-300 bg-white/5 hover:bg-white/10"
+             >
+              Cancel
+             </button>
          </div>
       </div>
     </header>

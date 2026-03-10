@@ -1,7 +1,6 @@
 'use client';
 
 import type { Document } from '@/lib/types';
-import { Card, CardContent } from '@/components/ui/card';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { FileText, User, AlertCircle, Calendar } from 'lucide-react';
@@ -36,10 +35,12 @@ export default function ExpiringSoonList({ documents }: ExpiringSoonListProps) {
         const urgencyColor = getUrgencyColor(daysLeft);
 
         return (
-            <Card 
+            <button
+                type="button"
                 key={doc.id} 
-                className="p-4 flex items-center gap-4 hover:bg-muted/50 cursor-pointer transition-colors"
+                className="w-full text-left p-4 flex items-center gap-4 hover:bg-muted/50 cursor-pointer transition-colors rounded-xl border border-white/10 bg-[#0C0C0E]"
                 onClick={() => router.push(`/dashboard/document/${doc.id}`)}
+                aria-label={`Open ${doc.displayName || doc.fileName}`}
             >
                 <div className={`p-2 rounded-full bg-secondary ${urgencyColor}`}>
                     <AlertCircle className="h-6 w-6" />
@@ -51,7 +52,7 @@ export default function ExpiringSoonList({ documents }: ExpiringSoonListProps) {
                     </div>
                     <div className="flex items-center gap-2 truncate">
                         <User className="h-4 w-4 text-muted-foreground shrink-0" />
-                        <span className="truncate">{doc.owner}</span>
+                        <span className="truncate">{doc.displayName || doc.owner}</span>
                     </div>
                    <div className="flex items-center gap-2 text-sm">
                         <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -61,7 +62,7 @@ export default function ExpiringSoonList({ documents }: ExpiringSoonListProps) {
                         </div>
                     </div>
                 </div>
-            </Card>
+            </button>
         )
       })}
     </div>

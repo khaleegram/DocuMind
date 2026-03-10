@@ -9,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import type { FilterCategory } from '@/app/dashboard/documents/page';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Filter, Search, X } from 'lucide-react';
+import { Filter, Search } from 'lucide-react';
 import Fuse from 'fuse.js';
 
 type FilterSidebarProps = {
@@ -102,17 +102,15 @@ export default function FilterSidebar({ filterOptions, activeFilters, onFilterCh
           )}
       </div>
       <ScrollArea className="h-full">
-         {isAiSearchActive ? (
-            <div className="px-4 py-8 text-center text-sm text-zinc-400">
-                <p className="font-semibold text-white">AI Search Active</p>
-                <p>Clear results to use manual filters.</p>
-            </div>
-         ) : (
-            <Accordion type="multiple" defaultValue={['category', 'tags']} className="w-full px-4">
-                <FilterCategorySection category="category" options={filterOptions.category} activeOptions={activeFilters.category} onFilterChange={onFilterChange} />
-                <FilterCategorySection category="tags" options={filterOptions.tags} activeOptions={activeFilters.tags} onFilterChange={onFilterChange} />
-            </Accordion>
-         )}
+        {isAiSearchActive && (
+          <div className="mx-4 mt-2 mb-3 rounded-xl border border-blue-500/20 bg-blue-500/10 px-3 py-2 text-xs text-blue-300">
+            AI results are active. Filters below will refine those results.
+          </div>
+        )}
+        <Accordion type="multiple" defaultValue={['category', 'tags']} className="w-full px-4">
+          <FilterCategorySection category="category" options={filterOptions.category} activeOptions={activeFilters.category} onFilterChange={onFilterChange} />
+          <FilterCategorySection category="tags" options={filterOptions.tags} activeOptions={activeFilters.tags} onFilterChange={onFilterChange} />
+        </Accordion>
       </ScrollArea>
     </>
   )

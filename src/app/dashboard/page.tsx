@@ -92,31 +92,56 @@ export default function DashboardHomePage() {
       
       {/* --- TRIPLE ISLAND HEADER --- */}
       <header className="fixed top-0 left-0 right-0 z-50 p-4 md:top-6 md:px-8">
-        <div className="relative flex items-center justify-between gap-4 max-w-4xl mx-auto">
-            {/* LEFT: BRAND */}
-            <div className="pointer-events-auto bg-[#111113] border border-white/10 p-2 rounded-2xl shadow-2xl flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0">
-                  <Image src="/icon.png" alt="DocuMind Logo" width={40} height={40} />
-                </div>
-                <div className="pr-3 hidden md:block">
-                    <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-bold leading-none mb-1">Secure</p>
-                    <p className="text-sm font-black tracking-tight leading-none">VAULT OS</p>
-                </div>
-            </div>
+        <div className="max-w-4xl mx-auto">
+          <div className="relative flex items-center justify-between gap-4">
+              {/* LEFT: BRAND */}
+              <div className="pointer-events-auto bg-[#111113] border border-white/10 p-2 rounded-2xl shadow-2xl flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0">
+                      <Image src="/icon.png" alt="DocuMind Logo" width={40} height={40} />
+                  </div>
+                  <div className="pr-3 hidden md:block">
+                      <p className="text-xs uppercase tracking-[0.2em] text-zinc-500 font-bold leading-none mb-1">Secure</p>
+                      <p className="text-sm font-black tracking-tight leading-none">VAULT OS</p>
+                  </div>
+              </div>
 
-            {/* CENTER: ACTIONS (Desktop only) */}
-            <div className="absolute left-1/2 -translate-x-1/2 pointer-events-auto hidden md:flex items-center bg-[#111113]/90 backdrop-blur-xl border border-white/10 p-1.5 rounded-[1.2rem] shadow-2xl">
-              <button 
+              {/* CENTER: ACTIONS (Desktop only) */}
+              <div className="absolute left-1/2 -translate-x-1/2 pointer-events-auto hidden md:flex items-center bg-[#111113]/90 backdrop-blur-xl border border-white/10 p-1.5 rounded-[1.2rem] shadow-2xl">
+                <button 
+                  onClick={() => setUploadDialogOpen(true)}
+                  className="flex items-center gap-2 bg-white text-black hover:bg-zinc-200 px-4 py-2 rounded-[0.9rem] text-xs font-bold transition-all active:scale-95 shadow-lg"
+                >
+                  <Plus size={16} strokeWidth={3} />
+                  <span>Upload New</span>
+                </button>
+              </div>
+
+              {/* RIGHT: SEARCH (Desktop) */}
+              <form onSubmit={handleQuickSearchSubmit} className="pointer-events-auto hidden md:flex items-center bg-[#111113]/90 backdrop-blur-xl border border-white/10 p-1.5 rounded-2xl shadow-[0_0_20px_rgba(37,99,235,0.1)] transition-all focus-within:shadow-[0_0_30px_rgba(37,99,235,0.25)] focus-within:border-blue-500/40 w-full max-w-xs sm:w-auto">
+                 <Search size={16} className="ml-3 text-zinc-600" />
+                 <input 
+                    type="text" 
+                    placeholder="Quick search..."
+                    value={quickSearchQuery}
+                    onChange={(e) => setQuickSearchQuery(e.target.value)}
+                    className="bg-transparent border-none outline-none px-3 py-1.5 text-xs font-medium w-full placeholder:text-zinc-700"
+                    aria-label="Quick search documents"
+                 />
+              </form>
+
+              {/* RIGHT: UPLOAD (Mobile) */}
+              <button
                 onClick={() => setUploadDialogOpen(true)}
-                className="flex items-center gap-2 bg-white text-black hover:bg-zinc-200 px-4 py-2 rounded-[0.9rem] text-xs font-bold transition-all active:scale-95 shadow-lg"
+                className="md:hidden flex items-center gap-2 bg-white text-black hover:bg-zinc-200 px-4 h-12 rounded-2xl text-sm font-bold transition-all active:scale-95 shadow-lg"
+                aria-label="Upload documents"
               >
-                <Plus size={16} strokeWidth={3} />
-                <span>Upload New</span>
+                <Plus size={18} strokeWidth={3} />
+                <span>Upload</span>
               </button>
             </div>
 
-            {/* RIGHT: SEARCH */}
-            <form onSubmit={handleQuickSearchSubmit} className="pointer-events-auto flex items-center bg-[#111113]/90 backdrop-blur-xl border border-white/10 p-1.5 rounded-2xl shadow-[0_0_20px_rgba(37,99,235,0.1)] transition-all focus-within:shadow-[0_0_30px_rgba(37,99,235,0.25)] focus-within:border-blue-500/40 w-full max-w-xs sm:w-auto">
+            {/* MOBILE: SEARCH BAR */}
+            <form onSubmit={handleQuickSearchSubmit} className="pointer-events-auto mt-3 flex md:hidden items-center bg-[#111113]/90 backdrop-blur-xl border border-white/10 p-1.5 rounded-2xl shadow-[0_0_20px_rgba(37,99,235,0.1)] transition-all focus-within:shadow-[0_0_30px_rgba(37,99,235,0.25)] focus-within:border-blue-500/40">
                <Search size={16} className="ml-3 text-zinc-600" />
                <input 
                   type="text" 
@@ -124,20 +149,11 @@ export default function DashboardHomePage() {
                   value={quickSearchQuery}
                   onChange={(e) => setQuickSearchQuery(e.target.value)}
                   className="bg-transparent border-none outline-none px-3 py-1.5 text-xs font-medium w-full placeholder:text-zinc-700"
+                  aria-label="Quick search documents"
                />
-            </form>
+             </form>
         </div>
       </header>
-
-      {/* --- FLOATING ACTION BUTTON (Mobile only) --- */}
-      <div className="fixed bottom-6 right-6 z-50 md:hidden">
-          <button 
-            onClick={() => setUploadDialogOpen(true)}
-            className="flex items-center justify-center w-14 h-14 bg-white rounded-full shadow-2xl shadow-black/40 text-black active:scale-95 transition-transform"
-          >
-            <Plus size={24} strokeWidth={3} />
-          </button>
-      </div>
 
 
       <main className="max-w-4xl mx-auto px-6 pt-32 md:pt-40 pb-20 space-y-8">
@@ -162,26 +178,42 @@ export default function DashboardHomePage() {
             </div>
           </CardHeader>
           <CardContent className="px-8 pb-8 space-y-2">
-              {topDocuments.map((doc) => (
-                <div 
+              {topDocuments.length === 0 ? (
+                <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-6 text-center">
+                  <p className="text-sm text-zinc-400">No documents yet. Upload your first file to get started.</p>
+                  <Button
+                    onClick={() => setUploadDialogOpen(true)}
+                    className="mt-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl"
+                  >
+                    Upload First Document
+                  </Button>
+                </div>
+              ) : (
+                topDocuments.map((doc) => (
+                <button
+                  type="button"
                   key={doc.id}
                   onClick={() => router.push(`/dashboard/document/${doc.id}`)}
-                  className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] transition-all cursor-pointer group"
+                  className="w-full text-left flex items-center justify-between p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.05] transition-all cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                  aria-label={`Open ${doc.displayName || doc.fileName}`}
                 >
                   <div className="flex items-center gap-4 overflow-hidden">
                     <div className="text-zinc-600 group-hover:text-blue-500 transition-colors shrink-0">
-                      {doc.isProcessing ? <Loader2 className="animate-spin"/> : <FileText size={20}/> }
+                      {doc.isProcessing ? <Loader2 className="animate-spin" /> : <FileText size={20} />}
                     </div>
                     <div className="overflow-hidden">
-                      <p className="text-sm font-bold text-zinc-200 group-hover:text-white transition-colors truncate">{doc.owner || doc.fileName}</p>
-                      <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">
+                      <p className="text-sm font-bold text-zinc-200 group-hover:text-white transition-colors truncate">
+                        {doc.displayName || doc.fileName}
+                      </p>
+                      <p className="text-xs text-zinc-600 font-bold uppercase tracking-widest">
                         {doc.uploadedAt ? format(new Date(doc.uploadedAt), 'MMM dd, HH:mm') : 'Recently'}
                       </p>
                     </div>
                   </div>
                   <ChevronRight size={16} className="text-zinc-800 group-hover:text-white transition-all shrink-0 ml-2" />
-                </div>
-              ))}
+                </button>
+              )))
+              }
           </CardContent>
         </Card>
 
@@ -203,7 +235,7 @@ export default function DashboardHomePage() {
                     
                     <div className="text-right shrink-0">
                         <p className="text-6xl font-black text-white tabular-nums leading-none tracking-tighter">{documents.length}</p>
-                        <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-[0.2em] mt-2">Verified Files</p>
+                        <p className="text-xs font-bold text-zinc-600 uppercase tracking-[0.2em] mt-2">Verified Files</p>
                     </div>
                 </CardHeader>
                 

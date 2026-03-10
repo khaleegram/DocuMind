@@ -8,7 +8,7 @@ import DocumentList from '@/components/dashboard/document-list';
 import { UploadDialog } from '@/components/dashboard/upload-dialog';
 import { auth, db } from '@/lib/firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   collection,
   query,
@@ -54,6 +54,7 @@ const dedupeDocumentsById = (docs: DocumentType[]): DocumentType[] => {
 export default function AllDocumentsPage() {
   const [user, loading] = useAuthState(auth);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [documents, setDocuments] = useState<DocumentType[]>([]);
   const [isLoadingDocs, setIsLoadingDocs] = useState(true);
   const [isLoadingMoreDocs, setIsLoadingMoreDocs] = useState(false);
@@ -136,6 +137,12 @@ export default function AllDocumentsPage() {
     void fetchDocumentsPage({ reset: true });
   }, [user, loading, router, fetchDocumentsPage]);
 
+  useEffect(() => {
+    const queryFromUrl = (searchParams.get('q') ?? '').trim();
+    setSearchQuery(queryFromUrl);
+    setSubmittedSearchQuery(queryFromUrl);
+  }, [searchParams]);
+
   const filterOptions = useMemo(() => {
     const options: Record<FilterCategory, Set<string>> = {
       category: new Set(),
@@ -177,15 +184,19 @@ export default function AllDocumentsPage() {
     setAiSearchResults(null);
     setSearchQuery('');
     setSubmittedSearchQuery('');
-  }, []);
+    router.replace('/dashboard/documents');
+  }, [router]);
 
   const handleAiSearch = useCallback(
     async (searchString: string) => {
       if (!user) return;
 
       setIsAiSearching(true);
-      clearFilters();
       setSearchQuery(searchString);
+      setSubmittedSearchQuery(searchString.trim());
+      const nextParams = new URLSearchParams(searchParams.toString());
+      nextParams.set('q', searchString.trim());
+      router.replace(`/dashboard/documents?${nextParams.toString()}`);
 
       try {
         const idToken = await user.getIdToken();
@@ -193,7 +204,7 @@ export default function AllDocumentsPage() {
         let candidateDocuments = documents;
         if (documents.length > AI_SEARCH_MAX_DOCUMENTS) {
           const preFilter = new Fuse(documents, {
-            keys: ['owner', 'category', 'tags', 'keywords', 'summary'],
+            keys: ['displayName', 'documentType', 'owner', 'category', 'tags', 'keywords', 'summary'],
             threshold: 0.5,
             ignoreLocation: true,
           });
@@ -203,6 +214,8 @@ export default function AllDocumentsPage() {
 
         const documentsToSearch = candidateDocuments.map(docItem => ({
           id: docItem.id,
+          displayName: docItem.displayName,
+          documentType: docItem.documentType,
           owner: docItem.owner,
           category: docItem.category,
           tags: docItem.tags,
@@ -245,7 +258,7 @@ export default function AllDocumentsPage() {
         setIsAiSearching(false);
       }
     },
-    [user, clearFilters, documents, toast]
+    [user, documents, toast, router, searchParams]
   );
 
   const handleDeleteDocument = async (docId: string) => {
@@ -286,16 +299,21 @@ export default function AllDocumentsPage() {
   };
 
   const handleSearchSubmit = () => {
-    setAiSearchResults(null);
-    setSubmittedSearchQuery(searchQuery.trim());
+    const queryValue = searchQuery.trim();
+    setSubmittedSearchQuery(queryValue);
+
+    const nextParams = new URLSearchParams(searchParams.toString());
+    if (queryValue) {
+      nextParams.set('q', queryValue);
+    } else {
+      nextParams.delete('q');
+    }
+    const nextUrl = nextParams.size > 0 ? `/dashboard/documents?${nextParams.toString()}` : '/dashboard/documents';
+    router.replace(nextUrl);
   };
 
   const displayedDocuments = useMemo(() => {
-    if (aiSearchResults !== null) {
-      return aiSearchResults;
-    }
-
-    let filtered = documents;
+    let filtered = aiSearchResults ?? documents;
     const hasActiveFilters = Object.values(activeFilters).some(filterSet => filterSet.size > 0);
 
     if (hasActiveFilters) {
@@ -323,7 +341,7 @@ export default function AllDocumentsPage() {
 
     if (submittedSearchQuery) {
       const fuse = new Fuse(filtered, {
-        keys: ['owner', 'category', 'tags', 'keywords', 'summary', 'fileName'],
+        keys: ['displayName', 'documentType', 'owner', 'category', 'tags', 'keywords', 'summary', 'fileName'],
         threshold: 0.4,
         includeScore: true,
       });
@@ -342,10 +360,12 @@ export default function AllDocumentsPage() {
   }
 
   const showLoader = isLoadingDocs || isAiSearching;
-  const showEmptyState =
-    (displayedDocuments.length === 0 && (submittedSearchQuery.length > 0 || aiSearchResults !== null)) ||
-    (documents.length === 0 && !isLoadingDocs);
   const hasActiveManualFilters = Object.values(activeFilters).some(filterSet => filterSet.size > 0);
+  const hasActiveSearchContext =
+    hasActiveManualFilters || aiSearchResults !== null || submittedSearchQuery.length > 0;
+  const showEmptyState =
+    (displayedDocuments.length === 0 && hasActiveSearchContext) ||
+    (documents.length === 0 && !isLoadingDocs);
   const shouldShowLoadMore =
     hasMoreDocs &&
     !showLoader &&
