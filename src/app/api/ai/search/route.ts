@@ -8,6 +8,8 @@ export const runtime = 'nodejs';
 
 const SearchDocumentSchema = z.object({
   id: z.string().min(1),
+  displayName: z.string().default(''),
+  documentType: z.string().default(''),
   owner: z.string().default(''),
   category: z.string().default(''),
   tags: z.array(z.string()).default([]),

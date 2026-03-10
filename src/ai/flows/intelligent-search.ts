@@ -14,6 +14,8 @@ import { z } from 'zod';
 // Simplified Document schema for passing to the AI
 const DocumentSearchSchema = z.object({
   id: z.string(),
+  displayName: z.string(),
+  documentType: z.string(),
   owner: z.string(),
   category: z.string(),
   tags: z.array(z.string()),
@@ -48,7 +50,7 @@ const prompt = ai.definePrompt({
 Your task is to analyze the user's search query and the provided list of documents.
 You must identify the most relevant documents that match the user's query.
 
-Consider all fields for each document: owner, category, tags, summary, and keywords.
+Consider all fields for each document: displayName, documentType, owner, category, tags, summary, and keywords.
 The match does not have to be exact. Use contextual understanding. For example, a query for "John's driver license" should match a document with owner "John Doe" and category "Personal ID". A query for "Acme Corp invoice" should match a document with owner "Acme Corporation" and category "Financial" with a tag "invoice".
 
 Return an array containing the 'id' of each matching document. If no documents are a good match, return an empty array.
