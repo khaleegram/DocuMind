@@ -21,6 +21,11 @@ describe('parseDocumentFromFirestore', () => {
     expect(parsed.expiry).toBe('2030-01-01');
     expect(parsed.thumbnailUrl).toBeNull();
     expect(parsed.tags).toEqual(['contract']);
+    expect(parsed.displayName).toBe('Jane Doe');
+    expect(parsed.documentType).toBe('Document');
+    expect(parsed.uploadMode).toBe('single');
+    expect(parsed.fileCount).toBe(1);
+    expect(parsed.pageCount).toBeNull();
   });
 
   it('falls back to safe defaults for missing optional fields', () => {
@@ -39,5 +44,9 @@ describe('parseDocumentFromFirestore', () => {
     expect(parsed.keywords).toEqual([]);
     expect(parsed.expiry).toBeNull();
     expect(parsed.textContent).toBe('');
+    expect(parsed.displayName).toBe('Acme');
+    expect(parsed.documentType).toBe('Document');
+    expect(parsed.fileCount).toBe(1);
+    expect(parsed.pageCount).toBeNull();
   });
 });
