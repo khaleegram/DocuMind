@@ -9,6 +9,10 @@ const DeleteDocumentSchema = z.object({
   docId: z.string().min(1),
 });
 
+const StoredSourceFileSchema = z.object({
+  storagePath: z.string().min(1),
+});
+
 export async function POST(request: NextRequest) {
   const authResult = await requireUserFromBearerToken(request.headers.get('authorization'));
   if ('errorResponse' in authResult) return authResult.errorResponse;
@@ -33,10 +37,22 @@ export async function POST(request: NextRequest) {
   }
 
   const storagePath = typeof docData.storagePath === 'string' ? docData.storagePath : '';
+  const sourceFilesResult = z.array(StoredSourceFileSchema).safeParse(docData.sourceFiles);
+  const storagePaths = new Set<string>();
+  if (storagePath) {
+    storagePaths.add(storagePath);
+  }
+  if (sourceFilesResult.success) {
+    sourceFilesResult.data.forEach(file => storagePaths.add(file.storagePath));
+  }
 
   try {
-    if (storagePath) {
-      await adminStorage.bucket().file(storagePath).delete({ ignoreNotFound: true });
+    if (storagePaths.size > 0) {
+      await Promise.all(
+        Array.from(storagePaths).map(path =>
+          adminStorage.bucket().file(path).delete({ ignoreNotFound: true })
+        )
+      );
     }
 
     await docRef.delete();

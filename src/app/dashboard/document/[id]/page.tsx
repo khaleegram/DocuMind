@@ -10,32 +10,28 @@ import { parseDocumentFromFirestore } from '@/lib/types';
 import {
   Loader2,
   ArrowLeft,
+  Download,
   Send,
   User,
   Bot,
   Sparkles,
-  PanelLeft,
   FileWarning,
   ExternalLink,
   Image as ImageIcon,
+  Files,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Sheet,
-  SheetContent,
-  SheetTrigger,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from '@/components/ui/sheet';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import Header from '@/components/dashboard/header';
 import { UploadDialog } from '@/components/dashboard/upload-dialog';
 import Image from 'next/image';
+import { useToast } from '@/hooks/use-toast';
+import { downloadDocumentFile } from '@/lib/download-document';
+import { PdfPlaceholder, type DocumentPlaceholderKind } from '@/components/dashboard/pdf-placeholder';
 
 type Message = {
   sender: 'user' | 'ai';
@@ -44,6 +40,28 @@ type Message = {
 
 type ChatApiResponse = { answer: string };
 type SuggestionsApiResponse = { questions: string[] };
+
+const OFFICE_MIME_KIND_MAP: Record<string, DocumentPlaceholderKind> = {
+  'application/pdf': 'pdf',
+  'application/msword': 'docx',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+  'application/vnd.ms-excel': 'excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'excel',
+  'application/vnd.ms-powerpoint': 'powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'powerpoint',
+};
+
+const inferPlaceholderKind = (mimeType: string, fileName: string): DocumentPlaceholderKind | null => {
+  const mapped = OFFICE_MIME_KIND_MAP[mimeType];
+  if (mapped) return mapped;
+
+  const normalizedFileName = fileName.toLowerCase();
+  if (normalizedFileName.endsWith('.pdf')) return 'pdf';
+  if (normalizedFileName.endsWith('.doc') || normalizedFileName.endsWith('.docx')) return 'docx';
+  if (normalizedFileName.endsWith('.xls') || normalizedFileName.endsWith('.xlsx')) return 'excel';
+  if (normalizedFileName.endsWith('.ppt') || normalizedFileName.endsWith('.pptx')) return 'powerpoint';
+  return null;
+};
 
 export default function DocumentChatPage() {
   const [user, loadingAuth] = useAuthState(auth);
@@ -60,6 +78,9 @@ export default function DocumentChatPage() {
   const [isAnswering, setIsAnswering] = useState(false);
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [mobileView, setMobileView] = useState<'chat' | 'review'>('chat');
+  const [downloadingSourceIndex, setDownloadingSourceIndex] = useState<number | null>(null);
+  const { toast } = useToast();
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const initializedDocIdRef = useRef<string | null>(null);
@@ -163,7 +184,7 @@ export default function DocumentChatPage() {
         setMessages([
           {
             sender: 'ai',
-            text: `Hello! I'm ready to answer questions about "${docData.owner}". What would you like to know?`,
+            text: `Hello! I'm ready to answer questions about "${docData.displayName}". What would you like to know?`,
           },
         ]);
         if (docData.textContent.trim()) {
@@ -238,43 +259,180 @@ export default function DocumentChatPage() {
 
   if (!document) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#050505]">
-        <p>Document not found.</p>
+      <div className="flex h-screen items-center justify-center bg-[#050505] px-6">
+        <div className="max-w-md text-center rounded-3xl border border-white/10 bg-[#0C0C0E] p-8">
+          <p className="text-lg font-bold text-white">Document not found.</p>
+          <p className="mt-2 text-sm text-zinc-400">
+            The document may have been deleted or you may not have access.
+          </p>
+          <Button asChild className="mt-6 bg-blue-600 hover:bg-blue-500 text-white">
+            <Link href="/dashboard/documents">Back to All Documents</Link>
+          </Button>
+        </div>
       </div>
     );
   }
 
+  const sourceFiles =
+    document.sourceFiles.length > 0
+      ? document.sourceFiles
+      : [
+          {
+            fileName: document.fileName,
+            fileUrl: document.fileUrl,
+            mimeType: document.mimeType,
+            storagePath: document.storagePath,
+          },
+        ];
+  const activeSource = sourceFiles[0];
+
+  const handleDownloadSource = async (sourceIndex: number) => {
+    if (!document) return;
+    if (downloadingSourceIndex !== null) return;
+
+    const targetFileName = sourceFiles[sourceIndex]?.fileName || document.fileName;
+    setDownloadingSourceIndex(sourceIndex);
+    try {
+      await downloadDocumentFile({
+        docId: document.id,
+        sourceIndex,
+        fallbackFileName: targetFileName,
+      });
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'DOWNLOAD_FAILED',
+        description: error instanceof Error ? error.message : 'Could not download this file.',
+      });
+    } finally {
+      setDownloadingSourceIndex(null);
+    }
+  };
+
+  const SingleFileDownloadAction = () =>
+    sourceFiles.length === 1 ? (
+      <div className="mb-3 flex justify-end">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => void handleDownloadSource(0)}
+          disabled={downloadingSourceIndex !== null}
+          className="bg-white/5 border-white/10 hover:bg-white/10 text-zinc-300 hover:text-white"
+        >
+          {downloadingSourceIndex === 0 ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <Download className="mr-2 h-4 w-4" />
+          )}
+          Download
+        </Button>
+      </div>
+    ) : null;
+
+  const GroupedFileActions = () =>
+    sourceFiles.length > 1 ? (
+      <div className="mb-3 rounded-xl border border-white/10 bg-[#111113] px-3 py-2">
+        <div className="flex items-center gap-2 text-xs text-zinc-400">
+          <Files className="h-4 w-4 text-blue-400" />
+          <span>{sourceFiles.length} files in this grouped document</span>
+        </div>
+        <div className="mt-2 space-y-2">
+          {sourceFiles.map((file, index) => (
+            <div key={`${file.storagePath}-${index}`} className="flex items-center justify-between gap-2 rounded-lg bg-white/[0.03] px-2 py-2">
+              <span className="text-xs text-zinc-300 truncate">File {index + 1}</span>
+              <div className="flex items-center gap-2 shrink-0">
+                <Button
+                  asChild
+                  size="sm"
+                  variant="outline"
+                  className="bg-white/5 border-white/10 hover:bg-white/10 text-zinc-300 hover:text-white"
+                >
+                  <a href={file.fileUrl} target="_blank" rel="noopener noreferrer">
+                    Open
+                  </a>
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void handleDownloadSource(index)}
+                  disabled={downloadingSourceIndex !== null}
+                  className="bg-white/5 border-white/10 hover:bg-white/10 text-zinc-300 hover:text-white"
+                >
+                  {downloadingSourceIndex === index ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Download className="mr-1 h-4 w-4" />
+                      Download
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    ) : null;
+
   const DocumentViewer = () => {
-    if (document.mimeType === 'application/pdf') {
+    if (activeSource.mimeType === 'application/pdf') {
       return (
-        <div className="w-full h-full p-8 flex flex-col items-center justify-center bg-[#0C0C0E] rounded-3xl border border-white/5">
-          <Alert className="bg-[#111113] border-blue-500/20 text-blue-400">
-            <FileWarning className="h-4 w-4 !text-blue-400" />
-            <AlertTitle>PDF Preview Disabled</AlertTitle>
-            <AlertDescription className="text-blue-400/80">
-              For security and compatibility, open PDFs in a separate tab.
-            </AlertDescription>
-          </Alert>
-          <Button asChild className="mt-4 bg-blue-600 hover:bg-blue-500 text-white font-bold">
-            <a href={document.fileUrl} target="_blank" rel="noopener noreferrer">
-              <ExternalLink className="mr-2" />
-              Open PDF in New Tab
-            </a>
-          </Button>
+        <div className="w-full h-full p-3 bg-[#0C0C0E] rounded-3xl border border-white/5">
+          <SingleFileDownloadAction />
+          <GroupedFileActions />
+          <object
+            data={`${activeSource.fileUrl}#toolbar=0&navpanes=0`}
+            type="application/pdf"
+            className="w-full h-full rounded-2xl bg-[#111113]"
+          >
+            <div className="w-full h-full p-8 flex flex-col items-center justify-center">
+              <Alert className="bg-[#111113] border-blue-500/20 text-blue-400">
+                <FileWarning className="h-4 w-4 !text-blue-400" />
+                <AlertTitle>Inline PDF preview is unavailable</AlertTitle>
+                <AlertDescription className="text-blue-400/80">
+                  Your browser blocked embedded PDF rendering for this file.
+                </AlertDescription>
+              </Alert>
+              <Button asChild className="mt-4 bg-blue-600 hover:bg-blue-500 text-white font-bold">
+                <a href={activeSource.fileUrl} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="mr-2" />
+                  Open PDF in New Tab
+                </a>
+              </Button>
+            </div>
+          </object>
         </div>
       );
     }
 
-    if (document.mimeType.startsWith('image/')) {
+    if (activeSource.mimeType.startsWith('image/')) {
       return (
-        <div className="relative w-full h-full rounded-3xl overflow-hidden border border-white/5 bg-[#0C0C0E]">
-          <Image src={document.fileUrl} alt={document.fileName} fill className="object-contain" />
+        <div className="w-full h-full p-3 rounded-3xl overflow-hidden border border-white/5 bg-[#0C0C0E]">
+          <SingleFileDownloadAction />
+          <GroupedFileActions />
+          <div className="relative w-full h-full rounded-2xl overflow-hidden bg-[#111113]">
+            <Image src={activeSource.fileUrl} alt={activeSource.fileName} fill className="object-contain" />
+          </div>
         </div>
       );
     }
+
+    const placeholderKind = inferPlaceholderKind(activeSource.mimeType, activeSource.fileName);
 
     return (
       <div className="w-full h-full p-8 flex flex-col items-center justify-center bg-[#0C0C0E] rounded-3xl border border-white/5">
+        <SingleFileDownloadAction />
+        <GroupedFileActions />
+        {placeholderKind && (
+          <div className="mb-4 w-full max-w-[260px]">
+            <PdfPlaceholder
+              kind={placeholderKind}
+              pageCount={document.pageCount}
+              className="w-full rounded-2xl"
+            />
+          </div>
+        )}
         <Alert className="bg-[#111113] border-blue-500/20 text-blue-400">
           <ImageIcon className="h-4 w-4 !text-blue-400" />
           <AlertTitle>Preview Unavailable</AlertTitle>
@@ -283,7 +441,7 @@ export default function DocumentChatPage() {
           </AlertDescription>
         </Alert>
         <Button asChild className="mt-4 bg-blue-600 hover:bg-blue-500 text-white font-bold">
-          <a href={document.fileUrl} target="_blank" rel="noopener noreferrer">
+          <a href={activeSource.fileUrl} target="_blank" rel="noopener noreferrer">
             <ExternalLink className="mr-2" />
             Open Original File
           </a>
@@ -398,7 +556,7 @@ export default function DocumentChatPage() {
     <div className="min-h-screen bg-[#050505] text-white font-sans selection:bg-blue-500/40">
       <Header
         onUploadClick={() => setUploadDialogOpen(true)}
-        title={document.owner}
+        title={document.displayName}
         showSearch={false}
         showAiSearch={false}
       />
@@ -422,39 +580,42 @@ export default function DocumentChatPage() {
             <ChatPanel />
           </div>
         </div>
-        <div className="h-[calc(100vh-140px)] md:hidden flex flex-col">
-          <ChatPanel />
+        <div className="md:hidden max-w-7xl mx-auto mb-4">
+          <div className="grid grid-cols-2 gap-2 rounded-2xl border border-white/10 bg-[#0C0C0E] p-1">
+            <button
+              type="button"
+              onClick={() => setMobileView('chat')}
+              className={`h-10 rounded-xl text-sm font-bold transition-colors ${
+                mobileView === 'chat'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white/5 text-zinc-300 hover:bg-white/10'
+              }`}
+            >
+              Chat
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileView('review')}
+              className={`h-10 rounded-xl text-sm font-bold transition-colors ${
+                mobileView === 'review'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white/5 text-zinc-300 hover:bg-white/10'
+              }`}
+            >
+              Document Review
+            </button>
+          </div>
+        </div>
+        <div className="h-[calc(100vh-200px)] md:hidden flex flex-col">
+          {mobileView === 'chat' ? (
+            <ChatPanel />
+          ) : (
+            <div className="h-full overflow-hidden p-1 bg-[#0C0C0E] rounded-3xl border border-white/5">
+              <DocumentViewer />
+            </div>
+          )}
         </div>
       </main>
-
-      <div className="fixed bottom-6 right-6 z-50 md:hidden">
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
-              className="w-14 h-14 rounded-full bg-white/10 border-white/20 backdrop-blur-lg text-white"
-            >
-              <PanelLeft />
-              <span className="sr-only">View Document</span>
-            </Button>
-          </SheetTrigger>
-          <SheetContent
-            side="bottom"
-            className="h-[80vh] flex flex-col bg-[#050505] text-white border-t border-white/10 p-0"
-          >
-            <SheetHeader className="p-4 border-b border-white/10 text-left">
-              <SheetTitle className="text-white">Document Viewer</SheetTitle>
-              <SheetDescription className="text-zinc-400">{document.fileName}</SheetDescription>
-            </SheetHeader>
-            <div className="flex-1 overflow-y-auto p-4">
-              <div className="h-full">
-                <DocumentViewer />
-              </div>
-            </div>
-          </SheetContent>
-        </Sheet>
-      </div>
       <UploadDialog isOpen={isUploadDialogOpen} setIsOpen={setUploadDialogOpen} />
     </div>
   );
