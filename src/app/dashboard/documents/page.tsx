@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { Suspense, useState, useMemo, useEffect, useCallback } from 'react';
 import type { Document as DocumentType } from '@/lib/types';
 import { parseDocumentFromFirestore } from '@/lib/types';
 import Header from '@/components/dashboard/header';
@@ -31,6 +31,12 @@ import { AI_SEARCH_MAX_DOCUMENTS, DEFAULT_PAGE_SIZE } from '@/lib/constants';
 
 export type FilterCategory = 'category' | 'tags';
 
+const FullScreenLoader = () => (
+  <div className="flex h-screen items-center justify-center bg-[#050505]">
+    <Loader2 className="h-16 w-16 animate-spin text-blue-600" />
+  </div>
+);
+
 const findCanonicalName = (value: string, existingNames: Set<string>): string => {
   if (existingNames.has(value)) {
     return value;
@@ -51,7 +57,7 @@ const dedupeDocumentsById = (docs: DocumentType[]): DocumentType[] => {
   );
 };
 
-export default function AllDocumentsPage() {
+function AllDocumentsPageContent() {
   const [user, loading] = useAuthState(auth);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -351,13 +357,7 @@ export default function AllDocumentsPage() {
     return filtered;
   }, [documents, submittedSearchQuery, activeFilters, aiSearchResults]);
 
-  if (loading || (!user && !loading)) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-[#050505]">
-        <Loader2 className="h-16 w-16 animate-spin text-blue-600" />
-      </div>
-    );
-  }
+  if (loading || (!user && !loading)) return <FullScreenLoader />;
 
   const showLoader = isLoadingDocs || isAiSearching;
   const hasActiveManualFilters = Object.values(activeFilters).some(filterSet => filterSet.size > 0);
@@ -435,5 +435,13 @@ export default function AllDocumentsPage() {
         }}
       />
     </div>
+  );
+}
+
+export default function AllDocumentsPage() {
+  return (
+    <Suspense fallback={<FullScreenLoader />}>
+      <AllDocumentsPageContent />
+    </Suspense>
   );
 }

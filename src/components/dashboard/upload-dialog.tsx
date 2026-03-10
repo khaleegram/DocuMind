@@ -366,11 +366,11 @@ export function UploadDialog({ isOpen, setIsOpen, onUploadComplete }: UploadDial
 
   return (
     <Dialog open={isOpen} onOpenChange={open => (open ? setIsOpen(true) : closeDialog())}>
-      <DialogContent className="sm:max-w-[560px] bg-[#050505] border-white/10 p-0 rounded-[2.5rem] overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.9)] outline-none ring-0">
+      <DialogContent className="w-[calc(100vw-1rem)] max-w-[560px] max-h-[92dvh] bg-[#050505] border-white/10 p-0 rounded-[2rem] sm:rounded-[2.5rem] overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.9)] outline-none ring-0 flex flex-col">
         <div className="h-1.5 w-full bg-gradient-to-r from-blue-600 via-indigo-500 to-blue-600" />
 
-        <div className="relative p-8">
-          <div className="flex items-start justify-between mb-8">
+        <div className="relative flex-1 overflow-y-auto overscroll-contain p-5 sm:p-8">
+          <div className="flex items-start justify-between mb-6 sm:mb-8">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border-blue-500/20 flex items-center justify-center text-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.1)]">
                 <CloudUpload size={24} />
@@ -445,7 +445,7 @@ export function UploadDialog({ isOpen, setIsOpen, onUploadComplete }: UploadDial
             <div
               {...getRootProps({
                 className: cn(
-                  'relative flex flex-col items-center justify-center p-8 w-full h-52 border-2 border-dashed border-white/10 rounded-[1.5rem] cursor-pointer transition-colors duration-200 ease-in-out',
+                  'relative flex flex-col items-center justify-center p-6 sm:p-8 w-full h-44 sm:h-52 border-2 border-dashed border-white/10 rounded-[1.5rem] cursor-pointer transition-colors duration-200 ease-in-out',
                   isDragActive && 'border-blue-500 bg-blue-500/10'
                 ),
               })}
@@ -485,7 +485,7 @@ export function UploadDialog({ isOpen, setIsOpen, onUploadComplete }: UploadDial
               <p className="mb-2 text-xs font-bold uppercase tracking-widest text-zinc-500">
                 Selected Files
               </p>
-              <div className="max-h-40 overflow-y-auto space-y-2 pr-1">
+              <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
                 {files.map((file, index) => (
                   <div
                     key={`${file.name}-${index}`}
