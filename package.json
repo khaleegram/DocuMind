@@ -11,7 +11,13 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "check": "npm run lint && npm run typecheck && npm run test"
+    "check": "npm run lint && npm run typecheck && npm run test",
+    "thumbnails:backfill:dry": "node scripts/backfill-thumbnails.mjs --dry-run",
+    "thumbnails:backfill": "node scripts/backfill-thumbnails.mjs",
+    "thumbnails:backfill:force": "node scripts/backfill-thumbnails.mjs --force",
+    "page-counts:backfill:dry": "node scripts/backfill-page-counts.mjs --dry-run",
+    "page-counts:backfill": "node scripts/backfill-page-counts.mjs",
+    "page-counts:backfill:force": "node scripts/backfill-page-counts.mjs --force"
   },
   "dependencies": {
     "@genkit-ai/googleai": "^1.14.1",
@@ -57,6 +63,7 @@
     "react-firebase-hooks": "^5.1.1",
     "react-hook-form": "^7.54.2",
     "recharts": "^2.15.1",
+    "sharp": "^0.34.5",
     "tailwind-merge": "^3.0.1",
     "tailwindcss-animate": "^1.0.7",
     "uuid": "^9.0.1",
