@@ -15,7 +15,6 @@ import {
   User,
   Bot,
   Sparkles,
-  FileWarning,
   ExternalLink,
   Image as ImageIcon,
   Files,
@@ -32,6 +31,7 @@ import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
 import { downloadDocumentFile } from '@/lib/download-document';
 import { PdfPlaceholder, type DocumentPlaceholderKind } from '@/components/dashboard/pdf-placeholder';
+import { PdfInlineViewer } from '@/components/dashboard/pdf-inline-viewer';
 
 type Message = {
   sender: 'user' | 'ai';
@@ -381,27 +381,7 @@ export default function DocumentChatPage() {
         <div className="w-full h-full p-3 bg-[#0C0C0E] rounded-3xl border border-white/5">
           <SingleFileDownloadAction />
           <GroupedFileActions />
-          <object
-            data={`${activeSource.fileUrl}#toolbar=0&navpanes=0`}
-            type="application/pdf"
-            className="w-full h-full rounded-2xl bg-[#111113]"
-          >
-            <div className="w-full h-full p-8 flex flex-col items-center justify-center">
-              <Alert className="bg-[#111113] border-blue-500/20 text-blue-400">
-                <FileWarning className="h-4 w-4 !text-blue-400" />
-                <AlertTitle>Inline PDF preview is unavailable</AlertTitle>
-                <AlertDescription className="text-blue-400/80">
-                  Your browser blocked embedded PDF rendering for this file.
-                </AlertDescription>
-              </Alert>
-              <Button asChild className="mt-4 bg-blue-600 hover:bg-blue-500 text-white font-bold">
-                <a href={activeSource.fileUrl} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="mr-2" />
-                  Open PDF in New Tab
-                </a>
-              </Button>
-            </div>
-          </object>
+          <PdfInlineViewer fileUrl={activeSource.fileUrl} fileName={activeSource.fileName} />
         </div>
       );
     }
