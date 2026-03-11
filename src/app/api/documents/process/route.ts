@@ -18,6 +18,7 @@ import {
 } from '@/lib/constants';
 
 export const runtime = 'nodejs';
+export const maxDuration = 300;
 
 const ProcessRequestSchema = z.object({
   docId: z.string().min(1),
@@ -59,6 +60,23 @@ const normalizeErrorMessage = (error: unknown): string => {
     return error.message;
   }
   return 'Document processing failed.';
+};
+
+const withTimeout = async <T>(
+  promiseFactory: () => Promise<T>,
+  timeoutMs: number,
+  timeoutMessage: string
+): Promise<T> => {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<T>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promiseFactory(), timeoutPromise]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
 };
 
 const parseStoredSourceFiles = (documentData: Record<string, unknown>): StoredSourceFile[] => {
@@ -488,6 +506,15 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  await docRef.set(
+    {
+      isProcessing: true,
+      processingError: null,
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+
   const bucket = adminStorage.bucket();
 
   try {
@@ -529,9 +556,14 @@ export async function POST(request: NextRequest) {
 
     const textResults = await Promise.all(
       hydratedFiles.map(async file => {
-        if (!file.dataUrl) return { text: '' };
+        const dataUrl = file.dataUrl;
+        if (!dataUrl) return { text: '' };
         try {
-          return await extractTextFromImage({ documentDataUrl: file.dataUrl });
+          return await withTimeout(
+            () => extractTextFromImage({ documentDataUrl: dataUrl }),
+            35_000,
+            'Text extraction timed out.'
+          );
         } catch {
           return { text: '' };
         }
@@ -543,20 +575,26 @@ export async function POST(request: NextRequest) {
       .join('\n\n');
 
     const primaryAiFile = hydratedFiles.find(file => file.dataUrl);
+    const primaryAiDataUrl = primaryAiFile?.dataUrl ?? null;
     const fallbackMetadata = buildFallbackMetadata({
       fileName: hydratedFiles[0].fileName,
       mimeType: hydratedFiles[0].mimeType,
       fileCount: hydratedFiles.length,
     });
     let metadataResult: ExtractDocumentMetadataOutput = fallbackMetadata;
-    if (primaryAiFile?.dataUrl) {
+    if (primaryAiDataUrl) {
       try {
-        metadataResult = await extractDocumentMetadata({
-          documentDataUrl: primaryAiFile.dataUrl,
-          documentText: textContent || undefined,
-          fileNameHints: hydratedFiles.map(file => file.fileName),
-          fileCount: hydratedFiles.length,
-        });
+        metadataResult = await withTimeout(
+          () =>
+            extractDocumentMetadata({
+              documentDataUrl: primaryAiDataUrl,
+              documentText: textContent || undefined,
+              fileNameHints: hydratedFiles.map(file => file.fileName),
+              fileCount: hydratedFiles.length,
+            }),
+          35_000,
+          'Metadata extraction timed out.'
+        );
       } catch {
         metadataResult = fallbackMetadata;
       }
@@ -572,9 +610,18 @@ export async function POST(request: NextRequest) {
     const tags = Array.from(
       new Set((metadataResult.tags ?? []).map(tag => tag.trim()).filter(Boolean))
     );
-    const keywordResult = textContent
-      ? await enhanceSearchWithKeywords({ documentText: textContent })
-      : { keywords: metadataResult.keywords ?? [] };
+    let keywordResult: { keywords: string[] } = { keywords: metadataResult.keywords ?? [] };
+    if (textContent) {
+      try {
+        keywordResult = await withTimeout(
+          () => enhanceSearchWithKeywords({ documentText: textContent }),
+          12_000,
+          'Keyword extraction timed out.'
+        );
+      } catch {
+        keywordResult = { keywords: metadataResult.keywords ?? [] };
+      }
+    }
     const keywords = Array.from(
       new Set((keywordResult.keywords ?? []).map(keyword => keyword.trim()).filter(Boolean))
     );

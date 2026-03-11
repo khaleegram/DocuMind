@@ -53,6 +53,8 @@ type UploadedSourceFile = {
   storagePath: string;
 };
 
+const PROCESSING_CONCURRENCY = 2;
+
 const createUploadErrorMessage = (errorCode: string): string => {
   switch (errorCode) {
     case 'file-too-large':
@@ -321,13 +323,6 @@ export function UploadDialog({ isOpen, setIsOpen, onUploadComplete }: UploadDial
         }
       }
 
-      const processingResults = await Promise.allSettled(
-        createdDocIds.map(docId => triggerDocumentProcessing(docId, idToken))
-      );
-      const processingFailures = processingResults.filter(
-        result => result.status === 'rejected'
-      ).length;
-
       toast({
         title: 'UPLOAD_COMPLETE',
         description:
@@ -337,13 +332,41 @@ export function UploadDialog({ isOpen, setIsOpen, onUploadComplete }: UploadDial
         className: 'bg-black border-blue-500/50 text-white rounded-2xl',
       });
 
-      if (processingFailures > 0) {
-        toast({
-          variant: 'destructive',
-          title: 'PROCESSING_PARTIAL_FAILURE',
-          description: `${processingFailures} document(s) could not start AI processing automatically.`,
-        });
-      }
+      toast({
+        title: 'PROCESSING_STARTED',
+        description: 'AI processing is running in the background. You can keep using the app.',
+      });
+
+      const processInBackground = async () => {
+        let processingFailures = 0;
+        const queue = [...createdDocIds];
+
+        const worker = async () => {
+          while (queue.length > 0) {
+            const nextDocId = queue.shift();
+            if (!nextDocId) return;
+            try {
+              await triggerDocumentProcessing(nextDocId, idToken);
+            } catch {
+              processingFailures += 1;
+            }
+          }
+        };
+
+        const workerCount = Math.min(PROCESSING_CONCURRENCY, queue.length || 1);
+        await Promise.all(Array.from({ length: workerCount }, () => worker()));
+
+        if (processingFailures > 0) {
+          toast({
+            variant: 'destructive',
+            title: 'PROCESSING_PARTIAL_FAILURE',
+            description: `${processingFailures} document(s) failed to process. Please retry those files.`,
+          });
+        }
+
+        router.refresh();
+      };
+      void processInBackground();
 
       setIsOpen(false);
       setFiles([]);

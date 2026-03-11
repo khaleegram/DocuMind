@@ -15,6 +15,7 @@ import {
   ChevronDown,
   Folder,
   Files,
+  RotateCcw,
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -36,6 +37,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { PdfPlaceholder, type DocumentPlaceholderKind } from '@/components/dashboard/pdf-placeholder';
+
+const PROCESSING_STALE_THRESHOLD_MS = 10 * 60 * 1000;
 
 const OFFICE_MIME_KIND_MAP: Record<string, DocumentPlaceholderKind> = {
   'application/pdf': 'pdf',
@@ -59,12 +62,33 @@ const inferPlaceholderKind = (mimeType: string, fileName: string): DocumentPlace
   return null;
 };
 
-export function DocumentCard({ document, onDelete }: { document: Document, onDelete: (docId: string) => void }) {
+export function DocumentCard({
+  document,
+  onDelete,
+  onRetryProcessing,
+  isRetryingProcessing = false,
+}: {
+  document: Document;
+  onDelete: (docId: string) => void;
+  onRetryProcessing?: (docId: string) => void;
+  isRetryingProcessing?: boolean;
+}) {
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
   const [isDeleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
+  const displayName = document.displayName || document.fileName;
+  const processingAgeMs = Date.now() - new Date(document.uploadedAt).getTime();
+  const isStaleProcessing =
+    Boolean(document.isProcessing) &&
+    Number.isFinite(processingAgeMs) &&
+    processingAgeMs > PROCESSING_STALE_THRESHOLD_MS;
+  const hasProcessingFailure =
+    Boolean(document.processingError) ||
+    document.category === 'Processing Failed' ||
+    document.displayName === 'Processing Failed';
+  const canRetryProcessing = Boolean(onRetryProcessing) && (hasProcessingFailure || isStaleProcessing);
 
   const renderFilePreview = () => {
     const placeholderKind = inferPlaceholderKind(document.mimeType, document.fileName);
@@ -110,6 +134,12 @@ export function DocumentCard({ document, onDelete }: { document: Document, onDel
   };
 
 
+  const handleRetryProcessing = (event: { stopPropagation: () => void }) => {
+    event.stopPropagation();
+    if (!onRetryProcessing || isRetryingProcessing) return;
+    onRetryProcessing(document.id);
+  };
+
   if (document.isProcessing) {
     return (
       <div className="flex flex-col overflow-hidden rounded-[2rem] bg-[#0C0C0E] border border-white/5 p-1 h-full">
@@ -125,6 +155,25 @@ export function DocumentCard({ document, onDelete }: { document: Document, onDel
            <Skeleton className="h-9 w-20 rounded-xl bg-white/5" />
            <Skeleton className="h-9 w-9 rounded-xl bg-white/5" />
         </div>
+        {canRetryProcessing && (
+          <div className="px-5 pb-5">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={handleRetryProcessing}
+              disabled={isRetryingProcessing}
+              className="w-full bg-white/5 border-white/10 hover:bg-white/10 rounded-lg text-zinc-300 hover:text-white"
+            >
+              {isRetryingProcessing ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RotateCcw className="mr-2 h-4 w-4" />
+              )}
+              Retry Processing
+            </Button>
+          </div>
+        )}
       </div>
     )
   }
@@ -139,7 +188,6 @@ export function DocumentCard({ document, onDelete }: { document: Document, onDel
   const tagsToShow = document.tags?.slice(0, 3) || [];
   const parsedExpiry = document.expiry ? parseISO(document.expiry) : null;
   const shouldShowExpiry = Boolean(parsedExpiry && isValid(parsedExpiry));
-  const displayName = document.displayName || document.fileName;
   const primaryFileName = document.sourceFiles[0]?.fileName || document.fileName;
 
   const handleDownload = async (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -262,10 +310,24 @@ export function DocumentCard({ document, onDelete }: { document: Document, onDel
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="bg-[#111113] border-white/10 text-zinc-300">
-             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); window.open(document.fileUrl, '_blank'); }} className="focus:bg-white/5 focus:text-white">
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); window.open(document.fileUrl, '_blank'); }} className="focus:bg-white/5 focus:text-white">
               <LinkIcon className="mr-2 h-4 w-4" />
               View Original
             </DropdownMenuItem>
+            {canRetryProcessing && (
+              <DropdownMenuItem
+                onClick={handleRetryProcessing}
+                disabled={isRetryingProcessing}
+                className="focus:bg-white/5 focus:text-white"
+              >
+                {isRetryingProcessing ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                )}
+                Retry Processing
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem
               onClick={e => {
                 e.stopPropagation();

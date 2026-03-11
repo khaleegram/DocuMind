@@ -21,7 +21,7 @@ import {
   type QueryDocumentSnapshot,
   type DocumentData,
 } from 'firebase/firestore';
-import { Loader2 } from 'lucide-react';
+import { Loader2, RotateCcw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import FilterSidebar from '@/components/dashboard/filter-sidebar';
 import Fuse from 'fuse.js';
@@ -30,6 +30,8 @@ import { Button } from '@/components/ui/button';
 import { AI_SEARCH_MAX_DOCUMENTS, DEFAULT_PAGE_SIZE } from '@/lib/constants';
 
 export type FilterCategory = 'category' | 'tags';
+const PROCESSING_STALE_THRESHOLD_MS = 10 * 60 * 1000;
+const PROCESSING_RETRY_CONCURRENCY = 2;
 
 const FullScreenLoader = () => (
   <div className="flex h-screen items-center justify-center bg-[#050505]">
@@ -71,6 +73,8 @@ function AllDocumentsPageContent() {
   const [isUploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [aiSearchResults, setAiSearchResults] = useState<DocumentType[] | null>(null);
   const [isAiSearching, setIsAiSearching] = useState(false);
+  const [retryingDocIds, setRetryingDocIds] = useState<Set<string>>(new Set());
+  const [isRetryingBatch, setIsRetryingBatch] = useState(false);
   const [activeFilters, setActiveFilters] = useState<Record<FilterCategory, Set<string>>>({
     category: new Set(),
     tags: new Set(),
@@ -304,6 +308,115 @@ function AllDocumentsPageContent() {
     }
   };
 
+  const isRetryableDocument = useCallback((docItem: DocumentType) => {
+    if (
+      docItem.processingError ||
+      docItem.category === 'Processing Failed' ||
+      docItem.displayName === 'Processing Failed'
+    ) {
+      return true;
+    }
+    if (!docItem.isProcessing) return false;
+
+    const uploadedAtMs = new Date(docItem.uploadedAt).getTime();
+    if (!Number.isFinite(uploadedAtMs)) return false;
+
+    return Date.now() - uploadedAtMs > PROCESSING_STALE_THRESHOLD_MS;
+  }, []);
+
+  const triggerDocumentProcessing = useCallback(
+    async (docId: string, idToken: string) => {
+      const response = await fetch('/api/documents/process', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ docId }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(payload.error || 'Failed to retry processing.');
+      }
+    },
+    []
+  );
+
+  const retryProcessingForDocuments = useCallback(
+    (docIds: string[]) => {
+      if (!user) return;
+
+      const uniqueDocIds = Array.from(
+        new Set(docIds.filter(docId => docId && !retryingDocIds.has(docId)))
+      );
+      if (uniqueDocIds.length === 0) return;
+
+      setRetryingDocIds(prev => {
+        const next = new Set(prev);
+        uniqueDocIds.forEach(docId => next.add(docId));
+        return next;
+      });
+      if (uniqueDocIds.length > 1) {
+        setIsRetryingBatch(true);
+      }
+
+      toast({
+        title: 'RETRY_STARTED',
+        description: `Retrying processing for ${uniqueDocIds.length} document(s).`,
+      });
+
+      void (async () => {
+        let failures = 0;
+
+        try {
+          const idToken = await user.getIdToken();
+          const queue = [...uniqueDocIds];
+
+          const worker = async () => {
+            while (queue.length > 0) {
+              const nextDocId = queue.shift();
+              if (!nextDocId) return;
+              try {
+                await triggerDocumentProcessing(nextDocId, idToken);
+              } catch {
+                failures += 1;
+              }
+            }
+          };
+
+          const workerCount = Math.min(PROCESSING_RETRY_CONCURRENCY, queue.length || 1);
+          await Promise.all(Array.from({ length: workerCount }, () => worker()));
+        } catch {
+          failures = uniqueDocIds.length;
+        } finally {
+          setRetryingDocIds(prev => {
+            const next = new Set(prev);
+            uniqueDocIds.forEach(docId => next.delete(docId));
+            return next;
+          });
+          setIsRetryingBatch(false);
+        }
+
+        if (failures > 0) {
+          toast({
+            variant: 'destructive',
+            title: 'RETRY_PARTIAL_FAILURE',
+            description: `${failures} document(s) failed to restart processing.`,
+          });
+        } else {
+          toast({
+            title: 'RETRY_COMPLETE',
+            description: 'Processing retry finished for selected documents.',
+          });
+        }
+
+        void fetchDocumentsPage({ reset: true });
+      })();
+    },
+    [user, retryingDocIds, toast, triggerDocumentProcessing, fetchDocumentsPage]
+  );
+
   const handleSearchSubmit = () => {
     const queryValue = searchQuery.trim();
     setSubmittedSearchQuery(queryValue);
@@ -356,6 +469,10 @@ function AllDocumentsPageContent() {
 
     return filtered;
   }, [documents, submittedSearchQuery, activeFilters, aiSearchResults]);
+  const retryableDocumentIds = useMemo(
+    () => documents.filter(isRetryableDocument).map(docItem => docItem.id),
+    [documents, isRetryableDocument]
+  );
 
   if (loading || (!user && !loading)) return <FullScreenLoader />;
 
@@ -386,6 +503,30 @@ function AllDocumentsPageContent() {
         showAiSearch={true}
       />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 max-w-7xl mx-auto w-full">
+        {retryableDocumentIds.length > 0 && (
+          <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[#0C0C0E] p-4">
+            <div>
+              <p className="text-sm font-semibold text-white">
+                {retryableDocumentIds.length} document(s) are stuck or failed.
+              </p>
+              <p className="text-xs text-zinc-400">Run retry processing to recover them.</p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isRetryingBatch}
+              onClick={() => retryProcessingForDocuments(retryableDocumentIds)}
+              className="bg-white/5 border-white/10 hover:bg-white/10 text-zinc-300 hover:text-white rounded-xl"
+            >
+              {isRetryingBatch ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RotateCcw className="mr-2 h-4 w-4" />
+              )}
+              Retry Processing
+            </Button>
+          </div>
+        )}
         {showLoader ? (
           <div className="flex items-center justify-center pt-20">
             <Loader2 className="h-16 w-16 animate-spin text-blue-600" />
@@ -397,7 +538,12 @@ function AllDocumentsPageContent() {
           />
         ) : (
           <>
-            <DocumentList documents={displayedDocuments} onDelete={handleDeleteDocument} />
+            <DocumentList
+              documents={displayedDocuments}
+              onDelete={handleDeleteDocument}
+              onRetryProcessing={docId => retryProcessingForDocuments([docId])}
+              retryingDocIds={retryingDocIds}
+            />
             {shouldShowLoadMore && (
               <div className="mt-8 flex justify-center">
                 <Button
